@@ -1,12 +1,14 @@
-import { useStore, type Categoria, type ProductoProveedor } from "@/store";
+import { useState } from "react";
+import { useStore, type ProductoProveedor } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditableNumber } from "@/components/EditableNumber";
 import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Truck } from "lucide-react";
+import { Trash2, Plus, Truck, Tag } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { formatCLP } from "@/lib/format";
 import {
   AlertDialog,
@@ -20,12 +22,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const CATEGORIAS: Categoria[] = ["Fruta", "Snack", "Barra"];
-
 export default function Config() {
   const {
     ivaPorcentaje,
     setIva,
+    categorias,
+    addCategoria,
+    renameCategoria,
+    removeCategoria,
     proveedores,
     addProveedor,
     updateProveedor,
@@ -36,6 +40,35 @@ export default function Config() {
     resetToDefaults,
   } = useStore();
   const { toast } = useToast();
+  const [nuevaCategoria, setNuevaCategoria] = useState("");
+
+  const handleAddCategoria = () => {
+    const limpio = nuevaCategoria.trim();
+    if (!limpio) return;
+    if (categorias.includes(limpio)) {
+      toast({
+        title: "Categoría existente",
+        description: `Ya existe la categoría "${limpio}".`,
+        variant: "destructive",
+      });
+      return;
+    }
+    addCategoria(limpio);
+    toast({ title: "Categoría agregada", description: `"${limpio}" lista para usar.` });
+    setNuevaCategoria("");
+  };
+
+  const handleCategoriaChange = (proveedorId: string, prod: ProductoProveedor, value: string) => {
+    if (value === "__nueva__") {
+      const nombre = window.prompt("Nombre de la nueva categoría (ej: Galletones)");
+      const limpio = (nombre || "").trim();
+      if (!limpio) return;
+      if (!categorias.includes(limpio)) addCategoria(limpio);
+      updateProductoProveedor(proveedorId, prod.id, { categoria: limpio });
+    } else {
+      updateProductoProveedor(proveedorId, prod.id, { categoria: value });
+    }
+  };
 
   const handleReset = () => {
     if (
@@ -69,7 +102,7 @@ export default function Config() {
       precio: 0,
       precioIncluyeIva: false,
       unidades: 1,
-      categoria: "Fruta",
+      categoria: categorias[0] || "Sin categoría",
     });
   };
 
@@ -111,6 +144,104 @@ export default function Config() {
                 <span className="font-bold bg-muted px-2 py-1 rounded">
                   <EditableNumber value={ivaPorcentaje} onChange={setIva} />
                 </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="p-3 border-b border-border/50">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Tag className="h-4 w-4" /> Categorías de productos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 space-y-2 text-sm">
+              <p className="text-xs text-muted-foreground">
+                Crea nuevas categorías como "Galletones" o "Bebidas". Se aplican automáticamente al
+                stock, clientes y compras. También puedes crear una categoría asignándosela a un
+                producto desde el selector de cada producto.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={nuevaCategoria}
+                  onChange={(e) => setNuevaCategoria(e.target.value)}
+                  placeholder="Ej: Galletones"
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCategoria();
+                    }
+                  }}
+                  data-testid="input-nueva-categoria"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleAddCategoria}
+                  className="h-8 shrink-0"
+                  data-testid="button-add-categoria"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Agregar
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {categorias.map((cat) => (
+                  <div
+                    key={cat}
+                    className="flex items-center gap-1 bg-muted/40 rounded-md pl-2 pr-1 py-0.5 text-xs"
+                    data-testid={`categoria-${cat}`}
+                  >
+                    <EditableText
+                      value={cat}
+                      onChange={(v) => {
+                        const limpio = v.trim();
+                        if (!limpio || limpio === cat) return;
+                        if (categorias.includes(limpio)) {
+                          toast({
+                            title: "Categoría existente",
+                            description: `Ya existe "${limpio}".`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        renameCategoria(cat, limpio);
+                      }}
+                    />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-destructive"
+                          data-testid={`button-remove-categoria-${cat}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Eliminar categoría</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Vas a eliminar "{cat}". Los productos con esta categoría quedarán como
+                            "Sin categoría", y se borrarán las unidades de stock asociadas.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => removeCategoria(cat)}
+                            className="bg-destructive text-destructive-foreground"
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                ))}
+                {categorias.length === 0 && (
+                  <span className="text-xs text-muted-foreground">Sin categorías aún.</span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -229,20 +360,20 @@ export default function Config() {
                               />
                             </div>
                             <select
-                              value={prod.categoria}
-                              onChange={(e) =>
-                                updateProductoProveedor(prov.id, prod.id, {
-                                  categoria: e.target.value as Categoria,
-                                })
-                              }
-                              className="text-xs h-7 rounded border border-input bg-background px-1.5"
+                              value={categorias.includes(prod.categoria) ? prod.categoria : ""}
+                              onChange={(e) => handleCategoriaChange(prov.id, prod, e.target.value)}
+                              className="text-xs h-7 rounded border border-input bg-background px-1.5 max-w-[120px]"
                               data-testid={`select-categoria-${prod.id}`}
                             >
-                              {CATEGORIAS.map((c) => (
+                              {!categorias.includes(prod.categoria) && (
+                                <option value="">{prod.categoria || "Sin categoría"}</option>
+                              )}
+                              {categorias.map((c) => (
                                 <option key={c} value={c}>
                                   {c}
                                 </option>
                               ))}
+                              <option value="__nueva__">+ Nueva…</option>
                             </select>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>

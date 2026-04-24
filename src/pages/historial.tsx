@@ -5,7 +5,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCLP, parseCLP } from "@/lib/format";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowDownRight, ArrowUpRight, Download, Pencil, Trash2 } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Download, FileSpreadsheet, Pencil, Trash2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function Historial() {
-  const { historial, updateTransaccion, removeTransaccion } = useStore();
+  const { historial, clientes, categorias, updateTransaccion, removeTransaccion } = useStore();
   const [editing, setEditing] = useState<Transaccion | null>(null);
   const [deleting, setDeleting] = useState<Transaccion | null>(null);
   const [montoInput, setMontoInput] = useState("");
@@ -81,6 +82,125 @@ export default function Historial() {
     URL.revokeObjectURL(url);
   };
 
+  const exportarExcel = () => {
+    if (historial.length === 0) return;
+
+    const clienteNombre = (id?: string) =>
+      id ? clientes.find((c) => c.id === id)?.nombre ?? "" : "";
+
+    const fechaFmt = (iso: string) => format(new Date(iso), "dd-MM-yyyy HH:mm");
+    const round = (n: number) => Math.round(n);
+
+    const ventas = historial.filter((t) => t.tipo === "venta");
+    const compras = historial.filter((t) => t.tipo === "compra");
+
+    // Hoja: Resumen
+    const totalVentasNeto = ventas.reduce((a, t) => a + t.montoNeto, 0);
+    const totalVentasIva = ventas.reduce((a, t) => a + t.iva, 0);
+    const totalVentasTotal = ventas.reduce((a, t) => a + t.montoTotal, 0);
+    const totalComprasNeto = compras.reduce((a, t) => a + t.montoNeto, 0);
+    const totalComprasIva = compras.reduce((a, t) => a + t.iva, 0);
+    const totalComprasTotal = compras.reduce((a, t) => a + t.montoTotal, 0);
+    const utilidadNeta = totalVentasNeto - totalComprasNeto;
+    const margen = totalVentasNeto > 0 ? (utilidadNeta / totalVentasNeto) * 100 : 0;
+    const ivaAPagar = totalVentasIva - totalComprasIva;
+
+    const resumen = [
+      { Concepto: "Total ventas (neto)", Valor: round(totalVentasNeto) },
+      { Concepto: "IVA débito (ventas)", Valor: round(totalVentasIva) },
+      { Concepto: "Total ventas (c/IVA)", Valor: round(totalVentasTotal) },
+      { Concepto: "Total compras (neto)", Valor: round(totalComprasNeto) },
+      { Concepto: "IVA crédito (compras)", Valor: round(totalComprasIva) },
+      { Concepto: "Total compras (c/IVA)", Valor: round(totalComprasTotal) },
+      { Concepto: "Utilidad neta", Valor: round(utilidadNeta) },
+      { Concepto: "Margen %", Valor: Number(margen.toFixed(2)) },
+      { Concepto: "IVA a pagar (positivo) / a favor (negativo)", Valor: round(ivaAPagar) },
+      { Concepto: "Cantidad de ventas", Valor: ventas.length },
+      { Concepto: "Cantidad de compras", Valor: compras.length },
+    ];
+
+    // Reunir todas las categorías que aparecen en el historial + las actuales
+    const categoriasUsadas = new Set<string>(categorias);
+    historial.forEach((t) => {
+      if (t.stockDelta) {
+        Object.keys(t.stockDelta).forEach((k) => categoriasUsadas.add(k));
+      }
+    });
+    const categoriasOrden = Array.from(categoriasUsadas);
+
+    // Hoja: Ventas / Entregas
+    const ventasRows = ventas.map((t) => {
+      const row: Record<string, string | number> = {
+        Fecha: fechaFmt(t.fecha),
+        Cliente: clienteNombre(t.clienteId),
+        Detalle: t.detalles,
+      };
+      categoriasOrden.forEach((cat) => {
+        row[`${cat} (un)`] = Math.abs(t.stockDelta?.[cat] ?? 0);
+      });
+      row.Neto = round(t.montoNeto);
+      row.IVA = round(t.iva);
+      row.Total = round(t.montoTotal);
+      return row;
+    });
+
+    // Hoja: Compras / Costos
+    const comprasRows = compras.map((t) => {
+      const row: Record<string, string | number> = {
+        Fecha: fechaFmt(t.fecha),
+        Detalle: t.detalles,
+      };
+      categoriasOrden.forEach((cat) => {
+        row[`${cat} (un)`] = t.stockDelta?.[cat] ?? 0;
+      });
+      row.Neto = round(t.montoNeto);
+      row.IVA = round(t.iva);
+      row.Total = round(t.montoTotal);
+      return row;
+    });
+
+    // Hoja: Ganancias por cliente
+    const porCliente = new Map<string, { ventas: number; iva: number; total: number; entregas: number }>();
+    ventas.forEach((t) => {
+      const key = clienteNombre(t.clienteId) || "Sin cliente";
+      const cur = porCliente.get(key) ?? { ventas: 0, iva: 0, total: 0, entregas: 0 };
+      cur.ventas += t.montoNeto;
+      cur.iva += t.iva;
+      cur.total += t.montoTotal;
+      cur.entregas += 1;
+      porCliente.set(key, cur);
+    });
+    const gananciasRows = Array.from(porCliente.entries())
+      .map(([cliente, v]) => ({
+        Cliente: cliente,
+        Entregas: v.entregas,
+        "Ventas neto": round(v.ventas),
+        IVA: round(v.iva),
+        "Ventas total": round(v.total),
+      }))
+      .sort((a, b) => b["Ventas neto"] - a["Ventas neto"]);
+
+    // Hoja: Histórico completo
+    const historicoRows = historial.map((t) => ({
+      Fecha: fechaFmt(t.fecha),
+      Tipo: t.tipo,
+      Cliente: clienteNombre(t.clienteId),
+      Detalle: t.detalles,
+      Neto: round(t.montoNeto),
+      IVA: round(t.iva),
+      Total: round(t.montoTotal),
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), "Resumen");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ventasRows), "Ventas y Entregas");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(comprasRows), "Compras y Costos");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gananciasRows), "Ganancias por cliente");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(historicoRows), "Histórico completo");
+
+    XLSX.writeFile(wb, `gestion-colaciones-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
   return (
     <div className="flex flex-col h-full gap-4">
       <div className="flex items-center justify-between px-1 gap-2">
@@ -99,6 +219,16 @@ export default function Historial() {
           >
             <Download className="h-3.5 w-3.5 mr-1" />
             CSV
+          </Button>
+          <Button
+            size="sm"
+            className="h-8"
+            onClick={exportarExcel}
+            disabled={historial.length === 0}
+            data-testid="button-export-excel"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />
+            Excel
           </Button>
         </div>
       </div>
@@ -145,7 +275,10 @@ export default function Historial() {
                       {tx.tipo === "venta" ? "+" : "-"}
                       {formatCLP(tx.montoTotal)}
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-[10px] text-muted-foreground leading-tight">
+                      Neto: {formatCLP(tx.montoNeto)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground leading-tight">
                       IVA: {formatCLP(tx.iva)}
                     </div>
                   </div>

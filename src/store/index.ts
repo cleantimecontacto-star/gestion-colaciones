@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { addDays, startOfWeek, subWeeks } from "date-fns";
 
-export type Categoria = "Fruta" | "Snack" | "Barra";
+export type Categoria = string;
 
 export interface ProductoProveedor {
   id: string;
@@ -17,7 +16,7 @@ export interface Proveedor {
   id: string;
   nombre: string;
   productos: ProductoProveedor[];
-  despachoBase: number; // neto
+  despachoBase: number;
   despachoKilosBase: number;
   despachoPorKiloExtra: number;
 }
@@ -27,17 +26,9 @@ export type ModoCobro = "unitario" | "paquete";
 export interface Cliente {
   id: string;
   nombre: string;
-  config: {
-    frutas: number;
-    snacks: number;
-    barras: number;
-  };
-  diasEntrega: number; // por semana
-  precios: {
-    fruta: number;
-    snack: number;
-    barra: number;
-  };
+  config: Record<string, number>;
+  diasEntrega: number;
+  precios: Record<string, number>;
   modoCobro: ModoCobro;
   paquete: {
     unidades: number;
@@ -46,11 +37,7 @@ export interface Cliente {
   };
 }
 
-export interface Stock {
-  fruta: number;
-  snack: number;
-  barra: number;
-}
+export type Stock = Record<string, number>;
 
 export interface Transaccion {
   id: string;
@@ -60,7 +47,7 @@ export interface Transaccion {
   iva: number;
   montoTotal: number;
   detalles: string;
-  stockDelta?: Partial<Stock>;
+  stockDelta?: Record<string, number>;
   clienteId?: string;
 }
 
@@ -70,14 +57,14 @@ export interface ItemCotizacion {
   id: string;
   descripcion: string;
   cantidad: number;
-  precioUnitario: number; // neto
+  precioUnitario: number;
 }
 
 export interface Cotizacion {
   id: string;
   numero: string;
-  fecha: string; // ISO
-  vigencia: string; // ISO
+  fecha: string;
+  vigencia: string;
   clienteNombre: string;
   clienteRut: string;
   clienteEmail: string;
@@ -90,49 +77,55 @@ export interface Cotizacion {
 
 export interface AppState {
   ivaPorcentaje: number;
+  categorias: string[];
   proveedores: Proveedor[];
   clientes: Cliente[];
   stock: Stock;
   historial: Transaccion[];
   cotizaciones: Cotizacion[];
-  
-  // Actions
+
   setIva: (iva: number) => void;
-  
+
+  // Categorías
+  addCategoria: (nombre: string) => void;
+  renameCategoria: (oldNombre: string, nuevoNombre: string) => void;
+  removeCategoria: (nombre: string) => void;
+
   // Proveedores
   updateProveedor: (id: string, data: Partial<Proveedor>) => void;
   addProveedor: (proveedor: Proveedor) => void;
   removeProveedor: (id: string) => void;
-  
-  // Productos Proveedor
+
+  // Productos
   updateProductoProveedor: (proveedorId: string, productoId: string, data: Partial<ProductoProveedor>) => void;
   addProductoProveedor: (proveedorId: string, producto: ProductoProveedor) => void;
   removeProductoProveedor: (proveedorId: string, productoId: string) => void;
-  
+
   // Clientes
   updateCliente: (id: string, data: Partial<Cliente>) => void;
   addCliente: (cliente: Cliente) => void;
   removeCliente: (id: string) => void;
-  
+
   // Stock
-  updateStock: (categoria: keyof Stock, cantidad: number) => void;
-  addStock: (categoria: keyof Stock, cantidad: number) => void;
-  
+  updateStock: (categoria: string, cantidad: number) => void;
+  addStock: (categoria: string, cantidad: number) => void;
+
   // Transacciones
-  registrarCompra: (montoNeto: number, iva: number, montoTotal: number, detalles: string, itemsStock: Partial<Stock>) => void;
+  registrarCompra: (montoNeto: number, iva: number, montoTotal: number, detalles: string, itemsStock: Record<string, number>) => void;
   registrarVenta: (clienteId: string) => void;
-  registrarVentaPersonalizada: (clienteId: string, unidades: { fruta: number; snack: number; barra: number }) => void;
+  registrarVentaPersonalizada: (clienteId: string, unidades: Record<string, number>) => void;
   updateTransaccion: (id: string, data: Partial<Pick<Transaccion, "montoTotal" | "detalles" | "fecha">>) => void;
   removeTransaccion: (id: string) => void;
-  
+
   // Cotizaciones
   addCotizacion: (c: Cotizacion) => void;
   updateCotizacion: (id: string, data: Partial<Cotizacion>) => void;
   removeCotizacion: (id: string) => void;
 
-  // Reset
   resetToDefaults: () => void;
 }
+
+const DEFAULT_CATEGORIAS = ["Fruta", "Snack", "Barra"];
 
 const DEFAULT_PROVEEDORES: Proveedor[] = [
   {
@@ -148,7 +141,7 @@ const DEFAULT_PROVEEDORES: Proveedor[] = [
       { id: "prod4", nombre: "Fruta Mix 12 Kg", precio: 21990, precioIncluyeIva: false, unidades: 65, categoria: "Fruta" },
       { id: "prod5", nombre: "Snacks Mix 40 un", precio: 26990, precioIncluyeIva: false, unidades: 40, categoria: "Snack" },
       { id: "prod6", nombre: "Snacks Mix 60 un", precio: 37990, precioIncluyeIva: false, unidades: 60, categoria: "Snack" },
-    ]
+    ],
   },
   {
     id: "p2",
@@ -159,8 +152,8 @@ const DEFAULT_PROVEEDORES: Proveedor[] = [
     productos: [
       { id: "prod7", nombre: "Barra Cereal 20g caja 150 un", precio: 28500, precioIncluyeIva: true, unidades: 150, categoria: "Barra" },
       { id: "prod8", nombre: "Mix Snack 30g caja 128 un", precio: 42208, precioIncluyeIva: true, unidades: 128, categoria: "Snack" },
-    ]
-  }
+    ],
+  },
 ];
 
 const DEFAULT_CLIENTES: Cliente[] = [
@@ -168,283 +161,477 @@ const DEFAULT_CLIENTES: Cliente[] = [
     id: "c1",
     nombre: "Cliente Demo",
     diasEntrega: 4,
-    config: {
-      frutas: 30,
-      snacks: 10,
-      barras: 10,
-    },
-    precios: {
-      fruta: 400,
-      snack: 700,
-      barra: 500,
-    },
+    config: { Fruta: 30, Snack: 10, Barra: 10 },
+    precios: { Fruta: 400, Snack: 700, Barra: 500 },
     modoCobro: "paquete",
     paquete: {
       unidades: 50,
       montoNeto: 24000,
       ivaIncluido: false,
-    }
-  }
+    },
+  },
 ];
 
 const generateInitialState = () => ({
   ivaPorcentaje: 19,
+  categorias: [...DEFAULT_CATEGORIAS],
   proveedores: DEFAULT_PROVEEDORES,
   clientes: DEFAULT_CLIENTES,
-  stock: { fruta: 0, snack: 0, barra: 0 },
-  historial: [],
+  stock: { Fruta: 0, Snack: 0, Barra: 0 } as Stock,
+  historial: [] as Transaccion[],
   cotizaciones: [] as Cotizacion[],
 });
+
+// Helpers para mantener stock/clientes sincronizados con la lista de categorías
+function ensureCategoriaInStock(stock: Stock, cat: string): Stock {
+  if (stock[cat] === undefined) return { ...stock, [cat]: 0 };
+  return stock;
+}
+
+function ensureCategoriaInClientes(clientes: Cliente[], cat: string): Cliente[] {
+  let mutated = false;
+  const next = clientes.map((c) => {
+    let cliente = c;
+    if (cliente.config[cat] === undefined) {
+      cliente = { ...cliente, config: { ...cliente.config, [cat]: 0 } };
+      mutated = true;
+    }
+    if (cliente.precios[cat] === undefined) {
+      cliente = { ...cliente, precios: { ...cliente.precios, [cat]: 0 } };
+      mutated = true;
+    }
+    return cliente;
+  });
+  return mutated ? next : clientes;
+}
+
+function syncCategoriasFromProductos(state: AppState): Partial<AppState> {
+  const usadas = new Set<string>();
+  state.proveedores.forEach((p) =>
+    p.productos.forEach((prod) => {
+      if (prod.categoria) usadas.add(prod.categoria);
+    })
+  );
+
+  const categorias = [...state.categorias];
+  let nuevoStock = state.stock;
+  let nuevosClientes = state.clientes;
+
+  usadas.forEach((cat) => {
+    if (!categorias.includes(cat)) categorias.push(cat);
+    nuevoStock = ensureCategoriaInStock(nuevoStock, cat);
+    nuevosClientes = ensureCategoriaInClientes(nuevosClientes, cat);
+  });
+
+  return { categorias, stock: nuevoStock, clientes: nuevosClientes };
+}
 
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       ...generateInitialState(),
-      
+
       setIva: (iva) => set({ ivaPorcentaje: iva }),
-      
-      updateProveedor: (id, data) => set((state) => ({
-        proveedores: state.proveedores.map(p => p.id === id ? { ...p, ...data } : p)
-      })),
+
+      addCategoria: (nombre) => {
+        const limpio = nombre.trim();
+        if (!limpio) return;
+        set((state) => {
+          if (state.categorias.includes(limpio)) return state;
+          return {
+            categorias: [...state.categorias, limpio],
+            stock: ensureCategoriaInStock(state.stock, limpio),
+            clientes: ensureCategoriaInClientes(state.clientes, limpio),
+          };
+        });
+      },
+
+      renameCategoria: (oldNombre, nuevoNombre) => {
+        const limpio = nuevoNombre.trim();
+        if (!limpio || oldNombre === limpio) return;
+        set((state) => {
+          if (!state.categorias.includes(oldNombre)) return state;
+          const categorias = state.categorias.map((c) => (c === oldNombre ? limpio : c));
+          const stock: Stock = { ...state.stock };
+          if (stock[oldNombre] !== undefined) {
+            stock[limpio] = (stock[limpio] || 0) + stock[oldNombre];
+            delete stock[oldNombre];
+          }
+          const proveedores = state.proveedores.map((p) => ({
+            ...p,
+            productos: p.productos.map((prod) =>
+              prod.categoria === oldNombre ? { ...prod, categoria: limpio } : prod
+            ),
+          }));
+          const clientes = state.clientes.map((c) => {
+            const config = { ...c.config };
+            const precios = { ...c.precios };
+            if (config[oldNombre] !== undefined) {
+              config[limpio] = config[oldNombre];
+              delete config[oldNombre];
+            }
+            if (precios[oldNombre] !== undefined) {
+              precios[limpio] = precios[oldNombre];
+              delete precios[oldNombre];
+            }
+            return { ...c, config, precios };
+          });
+          return { categorias, stock, proveedores, clientes };
+        });
+      },
+
+      removeCategoria: (nombre) => {
+        set((state) => {
+          const categorias = state.categorias.filter((c) => c !== nombre);
+          const stock: Stock = { ...state.stock };
+          delete stock[nombre];
+          const clientes = state.clientes.map((c) => {
+            const config = { ...c.config };
+            const precios = { ...c.precios };
+            delete config[nombre];
+            delete precios[nombre];
+            return { ...c, config, precios };
+          });
+          // Productos de proveedores con esa categoría: marcar como "Sin categoría"
+          const proveedores = state.proveedores.map((p) => ({
+            ...p,
+            productos: p.productos.map((prod) =>
+              prod.categoria === nombre ? { ...prod, categoria: "Sin categoría" } : prod
+            ),
+          }));
+          return { categorias, stock, clientes, proveedores };
+        });
+      },
+
+      updateProveedor: (id, data) =>
+        set((state) => ({
+          proveedores: state.proveedores.map((p) => (p.id === id ? { ...p, ...data } : p)),
+        })),
       addProveedor: (proveedor) => set((state) => ({ proveedores: [...state.proveedores, proveedor] })),
-      removeProveedor: (id) => set((state) => ({ proveedores: state.proveedores.filter(p => p.id !== id) })),
-      
-      updateProductoProveedor: (proveedorId, productoId, data) => set((state) => ({
-        proveedores: state.proveedores.map(p => p.id === proveedorId ? {
-          ...p,
-          productos: p.productos.map(prod => prod.id === productoId ? { ...prod, ...data } : prod)
-        } : p)
-      })),
-      addProductoProveedor: (proveedorId, producto) => set((state) => ({
-        proveedores: state.proveedores.map(p => p.id === proveedorId ? {
-          ...p,
-          productos: [...p.productos, producto]
-        } : p)
-      })),
-      removeProductoProveedor: (proveedorId, productoId) => set((state) => ({
-        proveedores: state.proveedores.map(p => p.id === proveedorId ? {
-          ...p,
-          productos: p.productos.filter(prod => prod.id !== productoId)
-        } : p)
-      })),
-      
-      updateCliente: (id, data) => set((state) => ({
-        clientes: state.clientes.map(c => c.id === id ? { ...c, ...data } : c)
-      })),
-      addCliente: (cliente) => set((state) => ({ clientes: [...state.clientes, cliente] })),
-      removeCliente: (id) => set((state) => ({ clientes: state.clientes.filter(c => c.id !== id) })),
-      
-      updateStock: (categoria, cantidad) => set((state) => ({
-        stock: { ...state.stock, [categoria]: cantidad }
-      })),
-      addStock: (categoria, cantidad) => set((state) => ({
-        stock: { ...state.stock, [categoria]: state.stock[categoria] + cantidad }
-      })),
-      
-      registrarCompra: (montoNeto, iva, montoTotal, detalles, itemsStock) => set((state) => ({
-        historial: [{
-          id: Date.now().toString(),
-          tipo: "compra",
-          fecha: new Date().toISOString(),
-          montoNeto,
-          iva,
-          montoTotal,
-          detalles,
-          stockDelta: {
-            fruta: itemsStock.fruta || 0,
-            snack: itemsStock.snack || 0,
-            barra: itemsStock.barra || 0,
+      removeProveedor: (id) => set((state) => ({ proveedores: state.proveedores.filter((p) => p.id !== id) })),
+
+      updateProductoProveedor: (proveedorId, productoId, data) =>
+        set((state) => {
+          const proveedores = state.proveedores.map((p) =>
+            p.id === proveedorId
+              ? {
+                  ...p,
+                  productos: p.productos.map((prod) =>
+                    prod.id === productoId ? { ...prod, ...data } : prod
+                  ),
+                }
+              : p
+          );
+          // Si cambió la categoría a una nueva, registrarla
+          if (data.categoria) {
+            return syncCategoriasFromProductos({ ...state, proveedores } as AppState);
           }
-        }, ...state.historial],
-        stock: {
-          fruta: state.stock.fruta + (itemsStock.fruta || 0),
-          snack: state.stock.snack + (itemsStock.snack || 0),
-          barra: state.stock.barra + (itemsStock.barra || 0),
-        }
-      })),
-      
-      registrarVenta: (clienteId) => set((state) => {
-        const cliente = state.clientes.find(c => c.id === clienteId);
-        if (!cliente) return state;
-
-        const diasPorEntrega = Math.max(1, cliente.diasEntrega / 2);
-        const uFruta = cliente.config.frutas * diasPorEntrega;
-        const uSnack = cliente.config.snacks * diasPorEntrega;
-        const uBarra = cliente.config.barras * diasPorEntrega;
-
-        const ivaPorcentaje = state.ivaPorcentaje;
-        let totalBruto: number;
-        let neto: number;
-        let iva: number;
-
-        if (cliente.modoCobro === "paquete") {
-          if (cliente.paquete.ivaIncluido) {
-            totalBruto = cliente.paquete.montoNeto;
-            neto = totalBruto / (1 + ivaPorcentaje / 100);
-            iva = totalBruto - neto;
-          } else {
-            neto = cliente.paquete.montoNeto;
-            iva = neto * (ivaPorcentaje / 100);
-            totalBruto = neto + iva;
-          }
-        } else {
-          const ingresoFruta = uFruta * cliente.precios.fruta;
-          const ingresoSnack = uSnack * cliente.precios.snack;
-          const ingresoBarra = uBarra * cliente.precios.barra;
-          totalBruto = ingresoFruta + ingresoSnack + ingresoBarra;
-          neto = totalBruto / (1 + ivaPorcentaje / 100);
-          iva = totalBruto - neto;
-        }
-
-        return {
-          historial: [{
-            id: Date.now().toString(),
-            tipo: "venta",
-            fecha: new Date().toISOString(),
-            montoNeto: neto,
-            iva: iva,
-            montoTotal: totalBruto,
-            detalles: `Entrega a ${cliente.nombre} (${uFruta} Frutas, ${uSnack} Snacks, ${uBarra} Barras)`,
-            clienteId: cliente.id,
-            stockDelta: {
-              fruta: -uFruta,
-              snack: -uSnack,
-              barra: -uBarra,
-            }
-          }, ...state.historial],
-          stock: {
-            fruta: Math.max(0, state.stock.fruta - uFruta),
-            snack: Math.max(0, state.stock.snack - uSnack),
-            barra: Math.max(0, state.stock.barra - uBarra),
-          }
-        };
-      }),
-
-      registrarVentaPersonalizada: (clienteId, unidades) => set((state) => {
-        const cliente = state.clientes.find(c => c.id === clienteId);
-        if (!cliente) return state;
-
-        const uFruta = Math.max(0, Math.floor(unidades.fruta));
-        const uSnack = Math.max(0, Math.floor(unidades.snack));
-        const uBarra = Math.max(0, Math.floor(unidades.barra));
-
-        const ivaPorcentaje = state.ivaPorcentaje;
-        let totalBruto: number;
-        let neto: number;
-        let iva: number;
-
-        if (cliente.modoCobro === "paquete") {
-          if (cliente.paquete.ivaIncluido) {
-            totalBruto = cliente.paquete.montoNeto;
-            neto = totalBruto / (1 + ivaPorcentaje / 100);
-            iva = totalBruto - neto;
-          } else {
-            neto = cliente.paquete.montoNeto;
-            iva = neto * (ivaPorcentaje / 100);
-            totalBruto = neto + iva;
-          }
-        } else {
-          totalBruto =
-            uFruta * cliente.precios.fruta +
-            uSnack * cliente.precios.snack +
-            uBarra * cliente.precios.barra;
-          neto = totalBruto / (1 + ivaPorcentaje / 100);
-          iva = totalBruto - neto;
-        }
-
-        const partes: string[] = [];
-        if (uFruta > 0) partes.push(`${uFruta} Frutas`);
-        if (uSnack > 0) partes.push(`${uSnack} Snacks`);
-        if (uBarra > 0) partes.push(`${uBarra} Barras`);
-        const detalle = partes.length > 0
-          ? `Entrega a ${cliente.nombre} (${partes.join(", ")})`
-          : `Entrega a ${cliente.nombre} (sin unidades)`;
-
-        return {
-          historial: [{
-            id: Date.now().toString(),
-            tipo: "venta",
-            fecha: new Date().toISOString(),
-            montoNeto: neto,
-            iva,
-            montoTotal: totalBruto,
-            detalles: detalle,
-            clienteId: cliente.id,
-            stockDelta: {
-              fruta: -uFruta,
-              snack: -uSnack,
-              barra: -uBarra,
-            }
-          }, ...state.historial],
-          stock: {
-            fruta: Math.max(0, state.stock.fruta - uFruta),
-            snack: Math.max(0, state.stock.snack - uSnack),
-            barra: Math.max(0, state.stock.barra - uBarra),
-          }
-        };
-      }),
-
-      updateTransaccion: (id, data) => set((state) => ({
-        historial: state.historial.map((tx) => {
-          if (tx.id !== id) return tx;
-          const updated: Transaccion = { ...tx, ...data };
-          if (data.montoTotal !== undefined) {
-            const ivaPorcentaje = state.ivaPorcentaje;
-            const neto = data.montoTotal / (1 + ivaPorcentaje / 100);
-            updated.montoTotal = data.montoTotal;
-            updated.montoNeto = neto;
-            updated.iva = data.montoTotal - neto;
-          }
-          return updated;
+          return { proveedores };
         }),
-      })),
 
-      removeTransaccion: (id) => set((state) => {
-        const tx = state.historial.find((t) => t.id === id);
-        if (!tx) return state;
-        const delta = tx.stockDelta || {};
-        return {
-          historial: state.historial.filter((t) => t.id !== id),
-          stock: {
-            fruta: Math.max(0, state.stock.fruta - (delta.fruta || 0)),
-            snack: Math.max(0, state.stock.snack - (delta.snack || 0)),
-            barra: Math.max(0, state.stock.barra - (delta.barra || 0)),
-          },
-        };
-      }),
+      addProductoProveedor: (proveedorId, producto) =>
+        set((state) => {
+          const proveedores = state.proveedores.map((p) =>
+            p.id === proveedorId ? { ...p, productos: [...p.productos, producto] } : p
+          );
+          return syncCategoriasFromProductos({ ...state, proveedores } as AppState);
+        }),
+
+      removeProductoProveedor: (proveedorId, productoId) =>
+        set((state) => ({
+          proveedores: state.proveedores.map((p) =>
+            p.id === proveedorId
+              ? { ...p, productos: p.productos.filter((prod) => prod.id !== productoId) }
+              : p
+          ),
+        })),
+
+      updateCliente: (id, data) =>
+        set((state) => ({
+          clientes: state.clientes.map((c) => (c.id === id ? { ...c, ...data } : c)),
+        })),
+      addCliente: (cliente) =>
+        set((state) => {
+          // Asegurar que tenga todas las categorías actuales
+          const config = { ...cliente.config };
+          const precios = { ...cliente.precios };
+          state.categorias.forEach((cat) => {
+            if (config[cat] === undefined) config[cat] = 0;
+            if (precios[cat] === undefined) precios[cat] = 0;
+          });
+          return { clientes: [...state.clientes, { ...cliente, config, precios }] };
+        }),
+      removeCliente: (id) => set((state) => ({ clientes: state.clientes.filter((c) => c.id !== id) })),
+
+      updateStock: (categoria, cantidad) =>
+        set((state) => ({ stock: { ...state.stock, [categoria]: cantidad } })),
+      addStock: (categoria, cantidad) =>
+        set((state) => ({
+          stock: { ...state.stock, [categoria]: (state.stock[categoria] || 0) + cantidad },
+        })),
+
+      registrarCompra: (montoNeto, iva, montoTotal, detalles, itemsStock) =>
+        set((state) => {
+          const nuevoStock: Stock = { ...state.stock };
+          Object.entries(itemsStock).forEach(([cat, cant]) => {
+            nuevoStock[cat] = (nuevoStock[cat] || 0) + (cant || 0);
+          });
+          return {
+            historial: [
+              {
+                id: Date.now().toString(),
+                tipo: "compra",
+                fecha: new Date().toISOString(),
+                montoNeto,
+                iva,
+                montoTotal,
+                detalles,
+                stockDelta: { ...itemsStock },
+              },
+              ...state.historial,
+            ],
+            stock: nuevoStock,
+          };
+        }),
+
+      registrarVenta: (clienteId) =>
+        set((state) => {
+          const cliente = state.clientes.find((c) => c.id === clienteId);
+          if (!cliente) return state;
+
+          const diasPorEntrega = Math.max(1, cliente.diasEntrega / 2);
+          const unidadesPorCat: Record<string, number> = {};
+          state.categorias.forEach((cat) => {
+            unidadesPorCat[cat] = (cliente.config[cat] || 0) * diasPorEntrega;
+          });
+
+          const ivaPct = state.ivaPorcentaje;
+          let totalBruto: number;
+          let neto: number;
+          let ivaMonto: number;
+
+          if (cliente.modoCobro === "paquete") {
+            if (cliente.paquete.ivaIncluido) {
+              totalBruto = cliente.paquete.montoNeto;
+              neto = totalBruto / (1 + ivaPct / 100);
+              ivaMonto = totalBruto - neto;
+            } else {
+              neto = cliente.paquete.montoNeto;
+              ivaMonto = neto * (ivaPct / 100);
+              totalBruto = neto + ivaMonto;
+            }
+          } else {
+            totalBruto = state.categorias.reduce(
+              (sum, cat) => sum + unidadesPorCat[cat] * (cliente.precios[cat] || 0),
+              0
+            );
+            neto = totalBruto / (1 + ivaPct / 100);
+            ivaMonto = totalBruto - neto;
+          }
+
+          const partes: string[] = [];
+          state.categorias.forEach((cat) => {
+            if (unidadesPorCat[cat] > 0) partes.push(`${unidadesPorCat[cat]} ${cat}`);
+          });
+
+          const stockDelta: Record<string, number> = {};
+          const nuevoStock: Stock = { ...state.stock };
+          state.categorias.forEach((cat) => {
+            const u = unidadesPorCat[cat];
+            stockDelta[cat] = -u;
+            nuevoStock[cat] = Math.max(0, (nuevoStock[cat] || 0) - u);
+          });
+
+          return {
+            historial: [
+              {
+                id: Date.now().toString(),
+                tipo: "venta",
+                fecha: new Date().toISOString(),
+                montoNeto: neto,
+                iva: ivaMonto,
+                montoTotal: totalBruto,
+                detalles: `Entrega a ${cliente.nombre}${partes.length ? ` (${partes.join(", ")})` : ""}`,
+                clienteId: cliente.id,
+                stockDelta,
+              },
+              ...state.historial,
+            ],
+            stock: nuevoStock,
+          };
+        }),
+
+      registrarVentaPersonalizada: (clienteId, unidades) =>
+        set((state) => {
+          const cliente = state.clientes.find((c) => c.id === clienteId);
+          if (!cliente) return state;
+
+          const ivaPct = state.ivaPorcentaje;
+          const unidadesLimpias: Record<string, number> = {};
+          Object.entries(unidades).forEach(([cat, val]) => {
+            unidadesLimpias[cat] = Math.max(0, Math.floor(val));
+          });
+
+          let totalBruto: number;
+          let neto: number;
+          let ivaMonto: number;
+
+          if (cliente.modoCobro === "paquete") {
+            if (cliente.paquete.ivaIncluido) {
+              totalBruto = cliente.paquete.montoNeto;
+              neto = totalBruto / (1 + ivaPct / 100);
+              ivaMonto = totalBruto - neto;
+            } else {
+              neto = cliente.paquete.montoNeto;
+              ivaMonto = neto * (ivaPct / 100);
+              totalBruto = neto + ivaMonto;
+            }
+          } else {
+            totalBruto = Object.entries(unidadesLimpias).reduce(
+              (sum, [cat, u]) => sum + u * (cliente.precios[cat] || 0),
+              0
+            );
+            neto = totalBruto / (1 + ivaPct / 100);
+            ivaMonto = totalBruto - neto;
+          }
+
+          const partes: string[] = [];
+          Object.entries(unidadesLimpias).forEach(([cat, u]) => {
+            if (u > 0) partes.push(`${u} ${cat}`);
+          });
+
+          const stockDelta: Record<string, number> = {};
+          const nuevoStock: Stock = { ...state.stock };
+          Object.entries(unidadesLimpias).forEach(([cat, u]) => {
+            stockDelta[cat] = -u;
+            nuevoStock[cat] = Math.max(0, (nuevoStock[cat] || 0) - u);
+          });
+
+          return {
+            historial: [
+              {
+                id: Date.now().toString(),
+                tipo: "venta",
+                fecha: new Date().toISOString(),
+                montoNeto: neto,
+                iva: ivaMonto,
+                montoTotal: totalBruto,
+                detalles:
+                  partes.length > 0
+                    ? `Entrega a ${cliente.nombre} (${partes.join(", ")})`
+                    : `Entrega a ${cliente.nombre} (sin unidades)`,
+                clienteId: cliente.id,
+                stockDelta,
+              },
+              ...state.historial,
+            ],
+            stock: nuevoStock,
+          };
+        }),
+
+      updateTransaccion: (id, data) =>
+        set((state) => ({
+          historial: state.historial.map((tx) => {
+            if (tx.id !== id) return tx;
+            const updated: Transaccion = { ...tx, ...data };
+            if (data.montoTotal !== undefined) {
+              const ivaPct = state.ivaPorcentaje;
+              const neto = data.montoTotal / (1 + ivaPct / 100);
+              updated.montoTotal = data.montoTotal;
+              updated.montoNeto = neto;
+              updated.iva = data.montoTotal - neto;
+            }
+            return updated;
+          }),
+        })),
+
+      removeTransaccion: (id) =>
+        set((state) => {
+          const tx = state.historial.find((t) => t.id === id);
+          if (!tx) return state;
+          const delta = tx.stockDelta || {};
+          const nuevoStock: Stock = { ...state.stock };
+          Object.entries(delta).forEach(([cat, val]) => {
+            nuevoStock[cat] = Math.max(0, (nuevoStock[cat] || 0) - (val || 0));
+          });
+          return {
+            historial: state.historial.filter((t) => t.id !== id),
+            stock: nuevoStock,
+          };
+        }),
 
       addCotizacion: (c) => set((state) => ({ cotizaciones: [c, ...state.cotizaciones] })),
-      updateCotizacion: (id, data) => set((state) => ({
-        cotizaciones: state.cotizaciones.map(c => c.id === id ? { ...c, ...data } : c)
-      })),
-      removeCotizacion: (id) => set((state) => ({
-        cotizaciones: state.cotizaciones.filter(c => c.id !== id)
-      })),
+      updateCotizacion: (id, data) =>
+        set((state) => ({
+          cotizaciones: state.cotizaciones.map((c) => (c.id === id ? { ...c, ...data } : c)),
+        })),
+      removeCotizacion: (id) =>
+        set((state) => ({ cotizaciones: state.cotizaciones.filter((c) => c.id !== id) })),
 
       resetToDefaults: () => set(generateInitialState()),
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 3,
+      version: 4,
       migrate: (persistedState: unknown, version: number) => {
-        const state = persistedState as Partial<AppState> | undefined;
+        const state = persistedState as Partial<AppState> & {
+          stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
+          clientes?: any[];
+          historial?: any[];
+        };
         if (!state) return persistedState as unknown as AppState;
+
         if (version < 2 && Array.isArray(state.clientes)) {
-          state.clientes = state.clientes.map((c) => {
-            const cliente = c as Cliente & Partial<Pick<Cliente, "modoCobro" | "paquete">>;
-            return {
-              ...cliente,
-              modoCobro: cliente.modoCobro ?? "unitario",
-              paquete: cliente.paquete ?? {
-                unidades: 50,
-                montoNeto: 24000,
-                ivaIncluido: false,
-              },
-            } as Cliente;
-          });
+          state.clientes = state.clientes.map((c: any) => ({
+            ...c,
+            modoCobro: c.modoCobro ?? "unitario",
+            paquete: c.paquete ?? { unidades: 50, montoNeto: 24000, ivaIncluido: false },
+          }));
         }
         if (version < 3) {
-          (state as Partial<AppState>).cotizaciones = (state as Partial<AppState>).cotizaciones ?? [];
+          state.cotizaciones = state.cotizaciones ?? [];
+        }
+        if (version < 4) {
+          // Migrar stock fixed → dynamic
+          const oldStock = (state.stock || {}) as { fruta?: number; snack?: number; barra?: number };
+          state.stock = {
+            Fruta: oldStock.fruta ?? 0,
+            Snack: oldStock.snack ?? 0,
+            Barra: oldStock.barra ?? 0,
+          };
+          // Migrar clientes
+          if (Array.isArray(state.clientes)) {
+            state.clientes = state.clientes.map((c: any) => {
+              const oldConfig = c.config || {};
+              const oldPrecios = c.precios || {};
+              return {
+                ...c,
+                config: {
+                  Fruta: oldConfig.frutas ?? oldConfig.Fruta ?? 0,
+                  Snack: oldConfig.snacks ?? oldConfig.Snack ?? 0,
+                  Barra: oldConfig.barras ?? oldConfig.Barra ?? 0,
+                },
+                precios: {
+                  Fruta: oldPrecios.fruta ?? oldPrecios.Fruta ?? 0,
+                  Snack: oldPrecios.snack ?? oldPrecios.Snack ?? 0,
+                  Barra: oldPrecios.barra ?? oldPrecios.Barra ?? 0,
+                },
+              };
+            });
+          }
+          // Migrar historial.stockDelta
+          if (Array.isArray(state.historial)) {
+            state.historial = state.historial.map((t: any) => {
+              if (!t.stockDelta) return t;
+              const old = t.stockDelta as { fruta?: number; snack?: number; barra?: number };
+              const nueva: Record<string, number> = {};
+              if (old.fruta !== undefined) nueva.Fruta = old.fruta;
+              if (old.snack !== undefined) nueva.Snack = old.snack;
+              if (old.barra !== undefined) nueva.Barra = old.barra;
+              return { ...t, stockDelta: nueva };
+            });
+          }
+          state.categorias = state.categorias ?? [...DEFAULT_CATEGORIAS];
         }
         return state as AppState;
       },
