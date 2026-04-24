@@ -20,6 +20,11 @@ export function EditableText({ value, onChange, className = "" }: EditableTextPr
     }
   }, [isEditing]);
 
+  const startEdit = () => {
+    setInputValue(value);
+    setIsEditing(true);
+  };
+
   const handleBlur = () => {
     setIsEditing(false);
     const trimmed = inputValue.trim();
@@ -47,21 +52,22 @@ export function EditableText({ value, onChange, className = "" }: EditableTextPr
         onChange={(e) => setInputValue(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className="h-7 text-sm"
+        className={`h-7 text-xs ${className}`}
       />
     );
   }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 cursor-pointer group ${className}`}
-      onClick={() => {
-        setInputValue(value);
-        setIsEditing(true);
-      }}
-    >
+    <span className={`inline-flex items-center gap-0.5 ${className}`}>
       <span>{value}</span>
-      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      <button
+        type="button"
+        onClick={startEdit}
+        className="text-muted-foreground hover:text-primary transition-colors ml-0.5"
+        aria-label="Editar"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
     </span>
   );
 }

@@ -9,21 +9,23 @@ export default function Dashboard() {
   const { historial, clientes, ivaPorcentaje } = useStore();
 
   const now = new Date();
-  const startOfThisWeek = subWeeks(now, 1); // Simple approx for 7 days
+  const startOfThisWeek = subWeeks(now, 1);
 
   const ventasThisWeek = historial.filter(t => t.tipo === "venta" && isAfter(new Date(t.fecha), startOfThisWeek));
   const comprasThisWeek = historial.filter(t => t.tipo === "compra" && isAfter(new Date(t.fecha), startOfThisWeek));
 
   const totalVentas = ventasThisWeek.reduce((acc, t) => acc + t.montoNeto, 0);
   const totalCompras = comprasThisWeek.reduce((acc, t) => acc + t.montoNeto, 0);
-  
+  const totalVentasBruto = ventasThisWeek.reduce((acc, t) => acc + t.montoTotal, 0);
+  const totalComprasBruto = comprasThisWeek.reduce((acc, t) => acc + t.montoTotal, 0);
+
   const ivaVentas = ventasThisWeek.reduce((acc, t) => acc + t.iva, 0);
   const ivaCompras = comprasThisWeek.reduce((acc, t) => acc + t.iva, 0);
-  
+
   const profit = totalVentas - totalCompras;
   const margin = totalVentas > 0 ? (profit / totalVentas) * 100 : 0;
-  
-  const ivaNeto = ivaVentas - ivaCompras; // If > 0, we pay. If < 0, we have credit.
+
+  const ivaNeto = ivaVentas - ivaCompras;
 
   const chartData = [
     { name: "Sem 1", profit: profit * 0.8 },
@@ -35,25 +37,27 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col h-full gap-4">
       <h2 className="text-xl font-bold tracking-tight px-1">Resumen Semanal</h2>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="shadow-sm border-border/50">
           <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Ingresos (Neto)</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Ingresos</CardTitle>
             <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent className="p-3 pt-1">
-            <div className="text-lg font-bold">{formatCLP(totalVentas)}</div>
+            <div className="text-lg font-bold">{formatCLP(totalVentasBruto)}</div>
+            <div className="text-xs text-muted-foreground">Neto: {formatCLP(totalVentas)}</div>
           </CardContent>
         </Card>
-        
+
         <Card className="shadow-sm border-border/50">
           <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Costos (Neto)</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Costos</CardTitle>
             <ShoppingCart className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent className="p-3 pt-1">
-            <div className="text-lg font-bold">{formatCLP(totalCompras)}</div>
+            <div className="text-lg font-bold">{formatCLP(totalComprasBruto)}</div>
+            <div className="text-xs text-muted-foreground">Neto: {formatCLP(totalCompras)}</div>
           </CardContent>
         </Card>
 
@@ -66,6 +70,7 @@ export default function Dashboard() {
             <div className={`text-lg font-bold ${profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
               {formatCLP(profit)}
             </div>
+            <div className="text-xs text-muted-foreground">Neto vs Neto</div>
           </CardContent>
         </Card>
 
@@ -76,6 +81,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-3 pt-1">
             <div className="text-lg font-bold">{margin.toFixed(1)}%</div>
+            <div className="text-xs text-muted-foreground">Sobre neto</div>
           </CardContent>
         </Card>
       </div>
@@ -117,7 +123,7 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => [formatCLP(value), "Utilidad"]}
                   contentStyle={{ fontSize: '12px', borderRadius: '8px' }}
                 />

@@ -13,25 +13,26 @@ export default function Compras() {
   return (
     <div className="flex flex-col h-full gap-4">
       <h2 className="text-xl font-bold tracking-tight px-1">Optimizador de Compras</h2>
-      
+
       <ScrollArea className="flex-1 -mx-2 px-2">
         <div className="space-y-6 pb-6">
           {categorias.map(cat => {
-            const allProducts = proveedores.flatMap(p => 
+            const allProducts = proveedores.flatMap(p =>
               p.productos.filter(prod => prod.categoria === cat).map(prod => {
-                // Calcular costo unitario real
-                const precioTotal = prod.precioIncluyeIva 
-                  ? prod.precio 
+                const neto = prod.precioIncluyeIva
+                  ? prod.precio / (1 + ivaPorcentaje / 100)
+                  : prod.precio;
+                const bruto = prod.precioIncluyeIva
+                  ? prod.precio
                   : prod.precio * (1 + ivaPorcentaje / 100);
-                
-                const costoUnitario = precioTotal / prod.unidades;
-                
+                const costoUnitario = bruto / prod.unidades;
                 return {
                   ...prod,
                   proveedorId: p.id,
                   proveedorNombre: p.nombre,
-                  precioTotal,
-                  costoUnitario
+                  neto,
+                  bruto,
+                  costoUnitario,
                 };
               })
             ).sort((a, b) => a.costoUnitario - b.costoUnitario);
@@ -48,7 +49,7 @@ export default function Compras() {
                 <CardContent className="p-0">
                   <div className="divide-y divide-border/50">
                     {allProducts.map((prod, idx) => (
-                      <div key={prod.id} className={`p-3 flex items-center justify-between text-sm ${idx === 0 ? 'bg-primary/5' : ''}`}>
+                      <div key={prod.id} className={`p-3 flex items-start justify-between text-sm ${idx === 0 ? 'bg-primary/5' : ''}`}>
                         <div className="flex-1">
                           <div className="font-medium flex items-center gap-2">
                             {prod.nombre}
@@ -58,17 +59,37 @@ export default function Compras() {
                             {prod.proveedorNombre} • Rinde {prod.unidades} un.
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right ml-3">
                           <div className="font-bold text-primary">
                             {formatCLP(prod.costoUnitario)} <span className="text-[10px] font-normal text-muted-foreground">/un</span>
                           </div>
-                          <div className="text-xs text-muted-foreground flex items-center justify-end gap-1 mt-0.5">
-                            Caja: <EditableNumber 
-                              value={prod.precio} 
-                              onChange={(val) => updateProductoProveedor(prod.proveedorId, prod.id, { precio: val })}
-                              isCurrency
-                            />
-                            {prod.precioIncluyeIva ? '(c/IVA)' : '(Neto)'}
+                          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Neto caja:</span>
+                              <EditableNumber
+                                value={Math.round(prod.neto)}
+                                onChange={v => {
+                                  const nuevoPrecio = prod.precioIncluyeIva
+                                    ? Math.round(v * (1 + ivaPorcentaje / 100))
+                                    : Math.round(v);
+                                  updateProductoProveedor(prod.proveedorId, prod.id, { precio: nuevoPrecio });
+                                }}
+                                isCurrency
+                              />
+                            </div>
+                            <div className="flex items-center justify-end gap-1">
+                              <span>C/IVA caja:</span>
+                              <EditableNumber
+                                value={Math.round(prod.bruto)}
+                                onChange={v => {
+                                  const nuevoPrecio = prod.precioIncluyeIva
+                                    ? Math.round(v)
+                                    : Math.round(v / (1 + ivaPorcentaje / 100));
+                                  updateProductoProveedor(prod.proveedorId, prod.id, { precio: nuevoPrecio });
+                                }}
+                                isCurrency
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>

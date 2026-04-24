@@ -111,9 +111,13 @@ export default function Ventas() {
             const paqueteBruto = cliente.paquete.ivaIncluido
               ? cliente.paquete.montoNeto
               : cliente.paquete.montoNeto * (1 + ivaPorcentaje / 100);
+            const paqueteNeto = cliente.paquete.ivaIncluido
+              ? paqueteBruto / (1 + ivaPorcentaje / 100)
+              : cliente.paquete.montoNeto;
             const ingresoPaqueteSemanal = paqueteBruto * entregasPorSemana;
 
             const totalSemanalBruto = esPaquete ? ingresoPaqueteSemanal : ingresoUnitarioSemanal;
+            const totalSemanalNeto = totalSemanalBruto / (1 + ivaPorcentaje / 100);
 
             return (
               <Card key={cliente.id} className="shadow-sm">
@@ -190,11 +194,19 @@ export default function Ventas() {
                           {cliente.paquete.ivaIncluido ? "IVA incluido" : `+ IVA (${ivaPorcentaje}%)`}
                         </button>
                       </div>
-                      <div className="text-[11px] text-muted-foreground bg-muted/20 rounded p-2 leading-relaxed">
-                        Bruto por entrega: <span className="font-semibold text-foreground">{formatCLP(paqueteBruto)}</span>
-                        {!cliente.paquete.ivaIncluido && (
-                          <> · IVA: {formatCLP(paqueteBruto - cliente.paquete.montoNeto)}</>
-                        )}
+                      <div className="text-[11px] bg-muted/20 rounded p-2 space-y-0.5">
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Neto por entrega:</span>
+                          <span className="font-semibold text-foreground">{formatCLP(paqueteNeto)}</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>IVA ({ivaPorcentaje}%):</span>
+                          <span className="font-semibold text-foreground">{formatCLP(paqueteBruto - paqueteNeto)}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-border/40 pt-0.5 mt-0.5">
+                          <span className="font-medium text-foreground">C/IVA por entrega:</span>
+                          <span className="font-bold text-foreground">{formatCLP(paqueteBruto)}</span>
+                        </div>
                       </div>
                     </div>
                   ) : null}
@@ -228,9 +240,19 @@ export default function Ventas() {
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center bg-primary/5 rounded p-2 border border-primary/10">
-                    <div className="text-xs font-medium text-muted-foreground">Ingreso Semanal Bruto</div>
-                    <div className="font-bold text-base text-primary">{formatCLP(totalSemanalBruto)}</div>
+                  <div className="bg-primary/5 rounded p-2 border border-primary/10 space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">Ingreso Semanal Neto</span>
+                      <span className="font-semibold">{formatCLP(totalSemanalNeto)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">IVA ({ivaPorcentaje}%)</span>
+                      <span className="font-semibold">{formatCLP(totalSemanalBruto - totalSemanalNeto)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-primary/20 pt-1">
+                      <span className="text-xs font-medium text-muted-foreground">Ingreso Semanal C/IVA</span>
+                      <span className="font-bold text-base text-primary">{formatCLP(totalSemanalBruto)}</span>
+                    </div>
                   </div>
                 </CardContent>
                 <CardFooter className="p-3 pt-0 flex gap-2">
@@ -332,24 +354,41 @@ export default function Ventas() {
             </div>
           </div>
 
-          <div className="flex justify-between items-center bg-primary/5 rounded p-2 border border-primary/10">
-            <div className="text-xs font-medium text-muted-foreground">
-              {customCliente?.modoCobro === "paquete" ? "Cobro fijo del paquete" : "Total entrega"}
-            </div>
-            <div className="font-bold text-base text-primary">
-              {customCliente
-                ? customCliente.modoCobro === "paquete"
-                  ? formatCLP(
-                      customCliente.paquete.ivaIncluido
-                        ? customCliente.paquete.montoNeto
-                        : customCliente.paquete.montoNeto * (1 + ivaPorcentaje / 100)
-                    )
-                  : formatCLP(
-                      customFruta * customCliente.precios.fruta +
-                        customSnack * customCliente.precios.snack +
-                        customBarra * customCliente.precios.barra
-                    )
-                : ""}
+          <div className="bg-primary/5 rounded p-2 border border-primary/10 space-y-1">
+            {customCliente?.modoCobro === "unitario" && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground">Neto</span>
+                <span className="font-semibold">
+                  {customCliente
+                    ? formatCLP(
+                        (customFruta * customCliente.precios.fruta +
+                          customSnack * customCliente.precios.snack +
+                          customBarra * customCliente.precios.barra) /
+                          (1 + ivaPorcentaje / 100)
+                      )
+                    : ""}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center">
+              <div className="text-xs font-medium text-muted-foreground">
+                {customCliente?.modoCobro === "paquete" ? "Cobro fijo del paquete" : "Total C/IVA"}
+              </div>
+              <div className="font-bold text-base text-primary">
+                {customCliente
+                  ? customCliente.modoCobro === "paquete"
+                    ? formatCLP(
+                        customCliente.paquete.ivaIncluido
+                          ? customCliente.paquete.montoNeto
+                          : customCliente.paquete.montoNeto * (1 + ivaPorcentaje / 100)
+                      )
+                    : formatCLP(
+                        customFruta * customCliente.precios.fruta +
+                          customSnack * customCliente.precios.snack +
+                          customBarra * customCliente.precios.barra
+                      )
+                  : ""}
+              </div>
             </div>
           </div>
 
