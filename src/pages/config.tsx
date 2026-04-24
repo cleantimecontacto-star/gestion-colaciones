@@ -132,7 +132,7 @@ export default function Config() {
     <div className="flex flex-col h-full gap-4">
       <h2 className="text-xl font-bold tracking-tight px-1">Configuración</h2>
 
-      <ScrollArea className="flex-1 -mx-2 px-2">
+      <ScrollArea className="flex-1 min-w-0 max-w-full">
         <div className="space-y-4 pb-6">
           <Card className="shadow-sm">
             <CardHeader className="p-3 border-b border-border/50">
