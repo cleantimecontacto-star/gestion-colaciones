@@ -1,4 +1,4 @@
-import { useStore } from "@/store";
+import { useStore, diasPorEntregaCliente } from "@/store";
 import { Card, CardContent } from "@/components/ui/card";
 import { EditableNumber } from "@/components/EditableNumber";
 import { formatCLP } from "@/lib/format";
@@ -70,7 +70,7 @@ export default function Stock() {
   // Demanda por entrega para detectar stock bajo
   const demandaEntrega = (cat: string) =>
     clientes.reduce((sum, c) => {
-      const dias = Math.max(1, c.diasEntrega / 2);
+      const dias = diasPorEntregaCliente(c);
       return sum + (c.config[cat] || 0) * dias;
     }, 0);
 
