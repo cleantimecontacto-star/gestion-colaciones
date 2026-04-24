@@ -27,11 +27,16 @@ export interface Cliente {
   id: string;
   nombre: string;
   config: Record<string, number>;
+  /** Días cubiertos por semana (lun-jue = 4) */
   diasEntrega: number;
+  /** Cantidad de entregas a la semana (lun y mié = 2) */
+  entregasPorSemana: number;
   precios: Record<string, number>;
   modoCobro: ModoCobro;
   paquete: {
+    /** Productos POR DÍA del paquete */
     unidades: number;
+    /** Monto neto POR DÍA del paquete */
     montoNeto: number;
     ivaIncluido: boolean;
   };
@@ -161,6 +166,7 @@ const DEFAULT_CLIENTES: Cliente[] = [
     id: "c1",
     nombre: "Cliente Demo",
     diasEntrega: 4,
+    entregasPorSemana: 2,
     config: { Fruta: 30, Snack: 10, Barra: 10 },
     precios: { Fruta: 400, Snack: 700, Barra: 500 },
     modoCobro: "paquete",
@@ -224,6 +230,12 @@ function syncCategoriasFromProductos(state: AppState): Partial<AppState> {
   });
 
   return { categorias, stock: nuevoStock, clientes: nuevosClientes };
+}
+
+/** Días que cubre cada entrega (días/sem ÷ entregas/sem) */
+export function diasPorEntregaCliente(c: Cliente): number {
+  const entregas = Math.max(1, c.entregasPorSemana || 1);
+  return Math.max(1, (c.diasEntrega || 1) / entregas);
 }
 
 export const useStore = create<AppState>()(
@@ -359,7 +371,17 @@ export const useStore = create<AppState>()(
             if (config[cat] === undefined) config[cat] = 0;
             if (precios[cat] === undefined) precios[cat] = 0;
           });
-          return { clientes: [...state.clientes, { ...cliente, config, precios }] };
+          return {
+            clientes: [
+              ...state.clientes,
+              {
+                ...cliente,
+                entregasPorSemana: Math.max(1, cliente.entregasPorSemana || 2),
+                config,
+                precios,
+              },
+            ],
+          };
         }),
       removeCliente: (id) => set((state) => ({ clientes: state.clientes.filter((c) => c.id !== id) })),
 
@@ -399,7 +421,7 @@ export const useStore = create<AppState>()(
           const cliente = state.clientes.find((c) => c.id === clienteId);
           if (!cliente) return state;
 
-          const diasPorEntrega = Math.max(1, cliente.diasEntrega / 2);
+          const diasPorEntrega = diasPorEntregaCliente(cliente);
           const unidadesPorCat: Record<string, number> = {};
           state.categorias.forEach((cat) => {
             unidadesPorCat[cat] = (cliente.config[cat] || 0) * diasPorEntrega;
@@ -411,15 +433,13 @@ export const useStore = create<AppState>()(
           let ivaMonto: number;
 
           if (cliente.modoCobro === "paquete") {
-            if (cliente.paquete.ivaIncluido) {
-              totalBruto = cliente.paquete.montoNeto;
-              neto = totalBruto / (1 + ivaPct / 100);
-              ivaMonto = totalBruto - neto;
-            } else {
-              neto = cliente.paquete.montoNeto;
-              ivaMonto = neto * (ivaPct / 100);
-              totalBruto = neto + ivaMonto;
-            }
+            // El monto del paquete está en formato POR DÍA → escalar a la entrega
+            const netoEntrega = cliente.paquete.ivaIncluido
+              ? (cliente.paquete.montoNeto / (1 + ivaPct / 100)) * diasPorEntrega
+              : cliente.paquete.montoNeto * diasPorEntrega;
+            neto = netoEntrega;
+            ivaMonto = neto * (ivaPct / 100);
+            totalBruto = neto + ivaMonto;
           } else {
             totalBruto = state.categorias.reduce(
               (sum, cat) => sum + unidadesPorCat[cat] * (cliente.precios[cat] || 0),
@@ -477,15 +497,25 @@ export const useStore = create<AppState>()(
           let ivaMonto: number;
 
           if (cliente.modoCobro === "paquete") {
-            if (cliente.paquete.ivaIncluido) {
-              totalBruto = cliente.paquete.montoNeto;
-              neto = totalBruto / (1 + ivaPct / 100);
-              ivaMonto = totalBruto - neto;
-            } else {
-              neto = cliente.paquete.montoNeto;
-              ivaMonto = neto * (ivaPct / 100);
-              totalBruto = neto + ivaMonto;
-            }
+            // Cobro proporcional al total de unidades respecto a la entrega estándar.
+            const diasPorEntrega = diasPorEntregaCliente(cliente);
+            const unidadesEstandarEntrega = (cliente.paquete.unidades || 0) * diasPorEntrega;
+            const unidadesEntregadas = Object.values(unidadesLimpias).reduce(
+              (a, b) => a + b,
+              0
+            );
+            const factor =
+              unidadesEstandarEntrega > 0
+                ? unidadesEntregadas / unidadesEstandarEntrega
+                : 1;
+
+            const netoEstandarEntrega = cliente.paquete.ivaIncluido
+              ? (cliente.paquete.montoNeto / (1 + ivaPct / 100)) * diasPorEntrega
+              : cliente.paquete.montoNeto * diasPorEntrega;
+
+            neto = netoEstandarEntrega * factor;
+            ivaMonto = neto * (ivaPct / 100);
+            totalBruto = neto + ivaMonto;
           } else {
             totalBruto = Object.entries(unidadesLimpias).reduce(
               (sum, [cat, u]) => sum + u * (cliente.precios[cat] || 0),
@@ -572,7 +602,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 4,
+      version: 5,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -632,6 +662,13 @@ export const useStore = create<AppState>()(
             });
           }
           state.categorias = state.categorias ?? [...DEFAULT_CATEGORIAS];
+        }
+        if (version < 5 && Array.isArray(state.clientes)) {
+          // Agrega entregasPorSemana (default 2: típico Lun y Mié)
+          state.clientes = state.clientes.map((c: any) => ({
+            ...c,
+            entregasPorSemana: c.entregasPorSemana ?? 2,
+          }));
         }
         return state as AppState;
       },
