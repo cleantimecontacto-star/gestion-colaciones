@@ -298,7 +298,7 @@ export default function Cotizaciones() {
       </div>
 
       {/* Lista */}
-      <ScrollArea className="flex-1 -mx-2 px-2">
+      <ScrollArea className="flex-1 min-w-0 max-w-full">
         <div className="space-y-2 pb-6">
           {filtradas.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
