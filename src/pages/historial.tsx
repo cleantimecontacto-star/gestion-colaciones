@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCLP, parseCLP } from "@/lib/format";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowDownRight, ArrowUpRight, Pencil, Trash2 } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Download, Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -57,13 +57,50 @@ export default function Historial() {
     setDeleting(null);
   };
 
+  const exportarCSV = () => {
+    if (historial.length === 0) return;
+    const sep = ";";
+    const headers = ["Fecha", "Tipo", "Detalle", "Neto", "IVA", "Total"];
+    const rows = historial.map((tx) => [
+      format(new Date(tx.fecha), "dd-MM-yyyy HH:mm"),
+      tx.tipo,
+      `"${tx.detalles.replace(/"/g, '""')}"`,
+      Math.round(tx.montoNeto).toString(),
+      Math.round(tx.iva).toString(),
+      Math.round(tx.montoTotal).toString(),
+    ]);
+    const csv = [headers.join(sep), ...rows.map((r) => r.join(sep))].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `historial-colaciones-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col h-full gap-4">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-1 gap-2">
         <h2 className="text-xl font-bold tracking-tight">Historial</h2>
-        <span className="text-xs text-muted-foreground">
-          {historial.length} {historial.length === 1 ? "registro" : "registros"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {historial.length} {historial.length === 1 ? "registro" : "registros"}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            onClick={exportarCSV}
+            disabled={historial.length === 0}
+            data-testid="button-export-csv"
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            CSV
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1 -mx-2 px-2">
