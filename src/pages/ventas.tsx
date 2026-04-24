@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useStore, type Cliente, type ModoCobro } from "@/store";
+import { useStore, type Cliente, type ModoCobro, diasPorEntregaCliente } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EditableNumber } from "@/components/EditableNumber";
@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 interface NuevoClienteForm {
   nombre: string;
   diasEntrega: number;
+  entregasPorSemana: number;
   modoCobro: ModoCobro;
   unidades: Record<string, number>;
   precios: Record<string, number>;
@@ -51,6 +52,7 @@ const buildDefaultNuevo = (categorias: string[]): NuevoClienteForm => {
   return {
     nombre: "",
     diasEntrega: 4,
+    entregasPorSemana: 2,
     modoCobro: "unitario",
     unidades,
     precios,
@@ -106,6 +108,7 @@ export default function Ventas() {
       id: `c${Date.now()}`,
       nombre: nombreLimpio,
       diasEntrega: Math.max(1, nuevo.diasEntrega || 1),
+      entregasPorSemana: Math.max(1, nuevo.entregasPorSemana || 1),
       config,
       precios,
       modoCobro: nuevo.modoCobro,
@@ -120,7 +123,7 @@ export default function Ventas() {
   };
 
   const calcularEntregaPrevia = (cliente: Cliente) => {
-    const diasPorEntrega = Math.max(1, cliente.diasEntrega / 2);
+    const diasPorEntrega = diasPorEntregaCliente(cliente);
     const unidadesCat: Record<string, number> = {};
     categorias.forEach((cat) => {
       unidadesCat[cat] = (cliente.config[cat] || 0) * diasPorEntrega;
@@ -128,13 +131,12 @@ export default function Ventas() {
     let totalBruto: number;
     let neto: number;
     if (cliente.modoCobro === "paquete") {
-      if (cliente.paquete.ivaIncluido) {
-        totalBruto = cliente.paquete.montoNeto;
-        neto = totalBruto / (1 + ivaPorcentaje / 100);
-      } else {
-        neto = cliente.paquete.montoNeto;
-        totalBruto = neto * (1 + ivaPorcentaje / 100);
-      }
+      // El monto del paquete está en formato POR DÍA → escalar a la entrega
+      const netoDia = cliente.paquete.ivaIncluido
+        ? cliente.paquete.montoNeto / (1 + ivaPorcentaje / 100)
+        : cliente.paquete.montoNeto;
+      neto = netoDia * diasPorEntrega;
+      totalBruto = neto * (1 + ivaPorcentaje / 100);
     } else {
       totalBruto = categorias.reduce(
         (sum, cat) => sum + unidadesCat[cat] * (cliente.precios[cat] || 0),
@@ -156,7 +158,7 @@ export default function Ventas() {
   };
 
   const openCustomDialog = (cliente: Cliente) => {
-    const diasPorEntrega = Math.max(1, cliente.diasEntrega / 2);
+    const diasPorEntrega = diasPorEntregaCliente(cliente);
     const inicial: Record<string, number> = {};
     categorias.forEach((cat) => {
       inicial[cat] = (cliente.config[cat] || 0) * diasPorEntrega;
@@ -170,7 +172,7 @@ export default function Ventas() {
 
   const setOnlyOne = (catSeleccionada: string) => {
     if (!customCliente) return;
-    const diasPorEntrega = Math.max(1, customCliente.diasEntrega / 2);
+    const diasPorEntrega = diasPorEntregaCliente(customCliente);
     const nuevo: Record<string, number> = {};
     categorias.forEach((cat) => {
       nuevo[cat] = cat === catSeleccionada ? (customCliente.config[cat] || 0) * diasPorEntrega : 0;
@@ -201,16 +203,27 @@ export default function Ventas() {
     setCustomCliente(null);
   };
 
-  const customTotalBruto = customCliente
-    ? customCliente.modoCobro === "paquete"
-      ? customCliente.paquete.ivaIncluido
-        ? customCliente.paquete.montoNeto
-        : customCliente.paquete.montoNeto * (1 + ivaPorcentaje / 100)
-      : Object.entries(customUnidades).reduce(
-          (sum, [cat, u]) => sum + u * (customCliente.precios[cat] || 0),
-          0
-        )
-    : 0;
+  // Total bruto de la entrega personalizada
+  const customTotalBruto = (() => {
+    if (!customCliente) return 0;
+    if (customCliente.modoCobro !== "paquete") {
+      return Object.entries(customUnidades).reduce(
+        (sum, [cat, u]) => sum + u * (customCliente.precios[cat] || 0),
+        0
+      );
+    }
+    // Modo paquete: cobro proporcional a las unidades respecto a la entrega estándar
+    const diasPorEntrega = diasPorEntregaCliente(customCliente);
+    const unidadesEstandarEntrega = (customCliente.paquete.unidades || 0) * diasPorEntrega;
+    const unidadesEntregadas = Object.values(customUnidades).reduce((a, b) => a + b, 0);
+    const factor =
+      unidadesEstandarEntrega > 0 ? unidadesEntregadas / unidadesEstandarEntrega : 1;
+    const netoDia = customCliente.paquete.ivaIncluido
+      ? customCliente.paquete.montoNeto / (1 + ivaPorcentaje / 100)
+      : customCliente.paquete.montoNeto;
+    const netoEntrega = netoDia * diasPorEntrega * factor;
+    return netoEntrega * (1 + ivaPorcentaje / 100);
+  })();
 
   const colsCount = Math.min(categorias.length, 4);
   const gridColsClass =
@@ -230,25 +243,34 @@ export default function Ventas() {
         <div className="space-y-4 pb-6">
           {clientes.map((cliente) => {
             const esPaquete = cliente.modoCobro === "paquete";
+            const diasPorEntrega = diasPorEntregaCliente(cliente);
+            const entregasPorSemana = Math.max(1, cliente.entregasPorSemana || 1);
 
+            // Modo unitario: ingreso semanal = sum(config*precio) * días/sem
             const ingresoUnitarioSemanal =
               categorias.reduce(
                 (sum, cat) => sum + (cliente.config[cat] || 0) * (cliente.precios[cat] || 0),
                 0
               ) * cliente.diasEntrega;
 
-            const entregasPorSemana = Math.max(1, cliente.diasEntrega / 2);
-            const paqueteBruto = cliente.paquete.ivaIncluido
-              ? cliente.paquete.montoNeto
-              : cliente.paquete.montoNeto * (1 + ivaPorcentaje / 100);
-            const ingresoPaqueteSemanal = paqueteBruto * entregasPorSemana;
-            const totalSemanalBruto = esPaquete ? ingresoPaqueteSemanal : ingresoUnitarioSemanal;
+            // Modo paquete: monto está POR DÍA → escalar a entrega y semana
+            const netoDia = cliente.paquete.ivaIncluido
+              ? cliente.paquete.montoNeto / (1 + ivaPorcentaje / 100)
+              : cliente.paquete.montoNeto;
+            const netoEntrega = netoDia * diasPorEntrega;
+            const brutoEntrega = netoEntrega * (1 + ivaPorcentaje / 100);
+            const ivaEntrega = brutoEntrega - netoEntrega;
+            const netoSemanaPaquete = netoDia * cliente.diasEntrega;
+            const brutoSemanaPaquete = netoSemanaPaquete * (1 + ivaPorcentaje / 100);
+
+            const totalSemanalBruto = esPaquete ? brutoSemanaPaquete : ingresoUnitarioSemanal;
             const totalSemanalNeto = esPaquete
-              ? (cliente.paquete.ivaIncluido
-                  ? cliente.paquete.montoNeto / (1 + ivaPorcentaje / 100)
-                  : cliente.paquete.montoNeto) * entregasPorSemana
+              ? netoSemanaPaquete
               : ingresoUnitarioSemanal / (1 + ivaPorcentaje / 100);
             const ivaSemanal = totalSemanalBruto - totalSemanalNeto;
+
+            const unidadesEntrega = (cliente.paquete.unidades || 0) * diasPorEntrega;
+            const unidadesSemana = (cliente.paquete.unidades || 0) * cliente.diasEntrega;
 
             return (
               <Card key={cliente.id} className="shadow-sm">
@@ -259,12 +281,21 @@ export default function Ventas() {
                       onChange={(v) => updateCliente(cliente.id, { nombre: v })}
                     />
                   </CardTitle>
-                  <div className="text-xs text-muted-foreground text-right leading-tight">
+                  <div className="text-xs text-muted-foreground text-right leading-tight space-y-0.5">
                     <div>
-                      Entregas / sem:{" "}
+                      Días/sem:{" "}
                       <EditableNumber
                         value={cliente.diasEntrega}
-                        onChange={(v) => updateCliente(cliente.id, { diasEntrega: v })}
+                        onChange={(v) => updateCliente(cliente.id, { diasEntrega: Math.max(1, v) })}
+                      />
+                    </div>
+                    <div>
+                      Entregas/sem:{" "}
+                      <EditableNumber
+                        value={entregasPorSemana}
+                        onChange={(v) =>
+                          updateCliente(cliente.id, { entregasPorSemana: Math.max(1, v) })
+                        }
                       />
                     </div>
                   </div>
@@ -328,7 +359,7 @@ export default function Ventas() {
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-muted/30 rounded p-2 text-center">
-                          <div className="text-xs text-muted-foreground mb-1">Productos / entrega</div>
+                          <div className="text-xs text-muted-foreground mb-1">Productos / día</div>
                           <div className="font-bold">
                             <EditableNumber
                               value={cliente.paquete.unidades}
@@ -342,7 +373,7 @@ export default function Ventas() {
                         </div>
                         <div className="bg-muted/30 rounded p-2 text-center">
                           <div className="text-xs text-muted-foreground mb-1">
-                            Monto {cliente.paquete.ivaIncluido ? "(IVA incl.)" : "neto"}
+                            Monto / día {cliente.paquete.ivaIncluido ? "(IVA incl.)" : "neto"}
                           </div>
                           <div className="font-bold text-primary">
                             <EditableNumber
@@ -358,7 +389,7 @@ export default function Ventas() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Cobro por entrega</span>
+                        <span className="text-muted-foreground">Cobro diario</span>
                         <button
                           type="button"
                           onClick={() =>
@@ -372,12 +403,20 @@ export default function Ventas() {
                           {cliente.paquete.ivaIncluido ? "IVA incluido" : `+ IVA (${ivaPorcentaje}%)`}
                         </button>
                       </div>
-                      <div className="text-[11px] text-muted-foreground bg-muted/20 rounded p-2 leading-relaxed">
-                        Bruto por entrega:{" "}
-                        <span className="font-semibold text-foreground">{formatCLP(paqueteBruto)}</span>
-                        {!cliente.paquete.ivaIncluido && (
-                          <> · IVA: {formatCLP(paqueteBruto - cliente.paquete.montoNeto)}</>
-                        )}
+                      <div className="text-[11px] text-muted-foreground bg-muted/20 rounded p-2 leading-relaxed space-y-0.5">
+                        <div>
+                          Por entrega ({diasPorEntrega} {diasPorEntrega === 1 ? "día" : "días"} ·{" "}
+                          {unidadesEntrega} un):{" "}
+                          <span className="font-semibold text-foreground">{formatCLP(brutoEntrega)}</span>{" "}
+                          <span className="text-[10px]">
+                            (neto {formatCLP(netoEntrega)} · IVA {formatCLP(ivaEntrega)})
+                          </span>
+                        </div>
+                        <div>
+                          Por semana ({cliente.diasEntrega}{" "}
+                          {cliente.diasEntrega === 1 ? "día" : "días"} · {unidadesSemana} un en{" "}
+                          {entregasPorSemana} {entregasPorSemana === 1 ? "entrega" : "entregas"})
+                        </div>
                       </div>
                     </div>
                   )}
@@ -465,7 +504,7 @@ export default function Ventas() {
             <DialogTitle>Entrega personalizada</DialogTitle>
             <DialogDescription>
               {customCliente?.modoCobro === "paquete"
-                ? `Ajusta la mezcla del paquete para ${customCliente?.nombre}. El cobro es el monto fijo del paquete.`
+                ? `Ajusta la mezcla y la cantidad para ${customCliente?.nombre}. El cobro se ajusta proporcionalmente a las unidades entregadas.`
                 : `Ingresa las unidades exactas de esta entrega para ${customCliente?.nombre}.`}
             </DialogDescription>
           </DialogHeader>
@@ -511,7 +550,7 @@ export default function Ventas() {
 
           <div className="flex justify-between items-center bg-primary/5 rounded p-2 border border-primary/10">
             <div className="text-xs font-medium text-muted-foreground">
-              {customCliente?.modoCobro === "paquete" ? "Cobro fijo del paquete" : "Total entrega"}
+              {customCliente?.modoCobro === "paquete" ? "Cobro proporcional" : "Total entrega"}
             </div>
             <div className="font-bold text-base text-primary">{formatCLP(customTotalBruto)}</div>
           </div>
@@ -548,20 +587,20 @@ export default function Ventas() {
                           {categorias.map((cat) => (
                             <div key={cat} className="flex justify-between">
                               <span>{cat} a descontar</span>
-                              <span className="font-medium text-foreground">{r.unidadesCat[cat] || 0}</span>
+                              <span className="font-semibold">{r.unidadesCat[cat] ?? 0}</span>
                             </div>
                           ))}
                           <div className="border-t border-border my-1" />
                           <div className="flex justify-between">
                             <span>Neto</span>
-                            <span className="font-medium text-foreground">{formatCLP(r.neto)}</span>
+                            <span className="font-semibold">{formatCLP(r.neto)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>IVA</span>
-                            <span className="font-medium text-foreground">{formatCLP(r.iva)}</span>
+                            <span className="font-semibold">{formatCLP(r.iva)}</span>
                           </div>
-                          <div className="flex justify-between pt-1 border-t border-border">
-                            <span className="font-semibold text-foreground">Total c/IVA</span>
+                          <div className="flex justify-between text-sm pt-1 border-t border-border">
+                            <span className="font-semibold">Total c/IVA</span>
                             <span className="font-bold text-primary">{formatCLP(r.totalBruto)}</span>
                           </div>
                         </div>
@@ -582,77 +621,139 @@ export default function Ventas() {
 
       {/* Nuevo cliente */}
       <Dialog open={nuevoOpen} onOpenChange={setNuevoOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nuevo cliente</DialogTitle>
             <DialogDescription>
-              Completa los datos. Podrás editar todo después haciendo clic en el lápiz.
+              Configura cómo entregas y cobras a este cliente.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-1">
+          <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="nuevo-nombre">Nombre</Label>
               <Input
                 id="nuevo-nombre"
                 value={nuevo.nombre}
                 onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
-                placeholder="Ej: Empresa ABC"
+                placeholder="Ej: Empresa XYZ"
                 data-testid="input-nuevo-nombre"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="nuevo-dias">Entregas / semana</Label>
+                <Label htmlFor="nuevo-dias">Días cubiertos / sem</Label>
                 <Input
                   id="nuevo-dias"
                   type="number"
                   min={1}
                   max={7}
                   value={nuevo.diasEntrega}
-                  onChange={(e) => setNuevo({ ...nuevo, diasEntrega: Number(e.target.value) || 1 })}
+                  onChange={(e) =>
+                    setNuevo({ ...nuevo, diasEntrega: Number(e.target.value) || 1 })
+                  }
+                  data-testid="input-nuevo-dias"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Modo de cobro</Label>
-                <div className="flex gap-1 bg-muted/40 rounded p-0.5 h-9">
-                  <button
-                    type="button"
-                    onClick={() => setNuevo({ ...nuevo, modoCobro: "unitario" })}
-                    className={`flex-1 text-xs rounded transition-colors ${
-                      nuevo.modoCobro === "unitario"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    Unitario
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNuevo({ ...nuevo, modoCobro: "paquete" })}
-                    className={`flex-1 text-xs rounded transition-colors ${
-                      nuevo.modoCobro === "paquete"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    Paquete
-                  </button>
-                </div>
+                <Label htmlFor="nuevo-entregas">Entregas / sem</Label>
+                <Input
+                  id="nuevo-entregas"
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={nuevo.entregasPorSemana}
+                  onChange={(e) =>
+                    setNuevo({ ...nuevo, entregasPorSemana: Number(e.target.value) || 1 })
+                  }
+                  data-testid="input-nuevo-entregas"
+                />
               </div>
             </div>
 
-            <div>
-              <Label className="text-xs text-muted-foreground">Unidades por día</Label>
-              <div className={`grid ${gridColsClass} gap-2 mt-1`}>
+            <div className="space-y-1.5">
+              <Label>Modo de cobro</Label>
+              <div className="flex gap-1 bg-muted/30 rounded p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setNuevo({ ...nuevo, modoCobro: "unitario" })}
+                  className={`flex-1 text-xs py-1.5 rounded ${
+                    nuevo.modoCobro === "unitario"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  Por unidad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNuevo({ ...nuevo, modoCobro: "paquete" })}
+                  className={`flex-1 text-xs py-1.5 rounded ${
+                    nuevo.modoCobro === "paquete"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  Por paquete
+                </button>
+              </div>
+            </div>
+
+            {nuevo.modoCobro === "paquete" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="nuevo-paq-un">Productos / día</Label>
+                  <Input
+                    id="nuevo-paq-un"
+                    type="number"
+                    min={0}
+                    value={nuevo.paqueteUnidades}
+                    onChange={(e) =>
+                      setNuevo({ ...nuevo, paqueteUnidades: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="nuevo-paq-mt">
+                    Monto / día {nuevo.paqueteIvaIncluido ? "(IVA incl.)" : "neto"}
+                  </Label>
+                  <Input
+                    id="nuevo-paq-mt"
+                    type="number"
+                    min={0}
+                    value={nuevo.paqueteMonto}
+                    onChange={(e) =>
+                      setNuevo({ ...nuevo, paqueteMonto: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+                <div className="col-span-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNuevo({ ...nuevo, paqueteIvaIncluido: !nuevo.paqueteIvaIncluido })
+                    }
+                    className="text-[11px] px-2 py-1 rounded bg-muted hover:bg-muted/70"
+                  >
+                    {nuevo.paqueteIvaIncluido
+                      ? "Cambiar a NETO"
+                      : `Cambiar a IVA incluido (${ivaPorcentaje}%)`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Composición por DÍA (categorías)</Label>
+              <div className={`grid ${gridColsClass} gap-2`}>
                 {categorias.map((cat) => (
                   <div key={cat} className="space-y-1">
-                    <Label htmlFor={`nuevo-u-${cat}`} className="text-[10px] text-muted-foreground truncate">
+                    <Label htmlFor={`nuevo-cat-${cat}`} className="text-[11px]">
                       {cat}
                     </Label>
                     <Input
-                      id={`nuevo-u-${cat}`}
+                      id={`nuevo-cat-${cat}`}
                       type="number"
                       min={0}
                       value={nuevo.unidades[cat] ?? 0}
@@ -663,24 +764,11 @@ export default function Ventas() {
                         })
                       }
                     />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {nuevo.modoCobro === "unitario" ? (
-              <div>
-                <Label className="text-xs text-muted-foreground">Precio neto por unidad</Label>
-                <div className={`grid ${gridColsClass} gap-2 mt-1`}>
-                  {categorias.map((cat) => (
-                    <div key={cat} className="space-y-1">
-                      <Label htmlFor={`nuevo-p-${cat}`} className="text-[10px] text-muted-foreground truncate">
-                        {cat}
-                      </Label>
+                    {nuevo.modoCobro === "unitario" && (
                       <Input
-                        id={`nuevo-p-${cat}`}
                         type="number"
                         min={0}
+                        placeholder="Precio"
                         value={nuevo.precios[cat] ?? 0}
                         onChange={(e) =>
                           setNuevo({
@@ -689,56 +777,19 @@ export default function Ventas() {
                           })
                         }
                       />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <Label className="text-xs text-muted-foreground">Configuración del paquete</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  <div className="space-y-1">
-                    <Label htmlFor="nuevo-pun" className="text-[10px] text-muted-foreground">
-                      Unidades / paquete
-                    </Label>
-                    <Input
-                      id="nuevo-pun"
-                      type="number"
-                      min={0}
-                      value={nuevo.paqueteUnidades}
-                      onChange={(e) => setNuevo({ ...nuevo, paqueteUnidades: Number(e.target.value) || 0 })}
-                    />
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="nuevo-pmo" className="text-[10px] text-muted-foreground">
-                      Monto {nuevo.paqueteIvaIncluido ? "(c/IVA)" : "(neto)"}
-                    </Label>
-                    <Input
-                      id="nuevo-pmo"
-                      type="number"
-                      min={0}
-                      value={nuevo.paqueteMonto}
-                      onChange={(e) => setNuevo({ ...nuevo, paqueteMonto: Number(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNuevo({ ...nuevo, paqueteIvaIncluido: !nuevo.paqueteIvaIncluido })}
-                  className="mt-2 px-2 py-1 rounded bg-muted hover:bg-muted/70 text-[11px]"
-                >
-                  {nuevo.paqueteIvaIncluido ? "IVA incluido" : `+ IVA (${ivaPorcentaje}%)`}
-                </button>
+                ))}
               </div>
-            )}
+            </div>
           </div>
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setNuevoOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={guardarNuevoCliente} data-testid="button-guardar-cliente">
-              Crear cliente
+            <Button onClick={guardarNuevoCliente} data-testid="button-save-nuevo-cliente">
+              Guardar cliente
             </Button>
           </DialogFooter>
         </DialogContent>
