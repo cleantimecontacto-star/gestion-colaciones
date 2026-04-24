@@ -108,7 +108,7 @@ export function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[100dvh] w-full overflow-hidden bg-background text-foreground">
+    <div className="flex flex-col md:flex-row h-[100dvh] w-full max-w-full overflow-x-hidden overflow-y-hidden bg-background text-foreground">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card">
         <div className="p-4 flex items-center justify-between border-b border-border">
@@ -160,7 +160,7 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+      <main className="flex-1 flex flex-col min-w-0 max-w-full h-full overflow-hidden relative">
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-3 border-b border-border bg-card shrink-0">
           <div className="flex flex-col">
@@ -183,8 +183,8 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-hidden bg-background">
-          <div className="h-full overflow-y-auto p-2 md:p-4 pb-24 md:pb-4">
+        <div className="flex-1 overflow-hidden bg-background min-w-0 max-w-full">
+          <div className="h-full w-full max-w-full overflow-y-auto overflow-x-hidden p-2 md:p-4 pb-24 md:pb-4">
             {children}
           </div>
         </div>
