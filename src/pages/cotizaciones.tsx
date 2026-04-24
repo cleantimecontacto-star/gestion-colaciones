@@ -73,133 +73,137 @@ const emptyForm = (ivaPorcentaje: number, cotizaciones: Cotizacion[]): Omit<Coti
 // ─── PDF ──────────────────────────────────────────────────────────────────────
 
 async function descargarPDF(cot: Cotizacion) {
-  const { default: jsPDF } = await import("jspdf");
-  const { default: autoTable } = await import("jspdf-autotable");
+  try {
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
 
-  const doc = new jsPDF({ unit: "mm", format: "letter" });
-  const W = doc.internal.pageSize.getWidth();
-  let y = 18;
+    const doc = new jsPDF({ unit: "mm", format: "letter" });
+    const W = doc.internal.pageSize.getWidth();
+    let y = 18;
 
-  // Encabezado empresa
-  doc.setFontSize(15);
-  doc.setFont("helvetica", "bold");
-  doc.text(EMPRESA.nombre, 14, y);
-  y += 7;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text(`RUT: ${EMPRESA.rut}`, 14, y);
-  y += 4;
-  doc.text(EMPRESA.giro, 14, y);
-  y += 9;
-
-  // Título cotización
-  doc.setFontSize(13);
-  doc.setFont("helvetica", "bold");
-  doc.text(`COTIZACIÓN Nº ${cot.numero}`, 14, y);
-  y += 6;
-
-  // Fechas
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Fecha: ${format(new Date(cot.fecha), "dd/MM/yyyy")}`, 14, y);
-  doc.text(`Válida hasta: ${format(new Date(cot.vigencia), "dd/MM/yyyy")}`, 90, y);
-  // Estado
-  doc.text(`Estado: ${ESTADO_CONFIG[cot.estado].label}`, W - 55, y);
-  y += 9;
-
-  // Línea
-  doc.setDrawColor(180);
-  doc.line(14, y, W - 14, y);
-  y += 6;
-
-  // Datos cliente
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("CLIENTE", 14, y);
-  y += 5;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  if (cot.clienteNombre) { doc.text(`Razón Social: ${cot.clienteNombre}`, 14, y); y += 4; }
-  if (cot.clienteRut)    { doc.text(`RUT: ${cot.clienteRut}`, 14, y); y += 4; }
-  if (cot.clienteEmail)  { doc.text(`Email: ${cot.clienteEmail}`, 14, y); y += 4; }
-  if (cot.clienteDireccion) { doc.text(`Dirección: ${cot.clienteDireccion}`, 14, y); y += 4; }
-  y += 4;
-
-  // Tabla de ítems
-  const { neto, iva, total } = calcularTotales(cot.items, cot.ivaPorcentaje);
-
-  autoTable(doc, {
-    startY: y,
-    head: [["#", "Descripción", "Cant.", "P. Unit. Neto", "Subtotal Neto"]],
-    body: cot.items
-      .filter((i) => i.descripcion.trim() !== "")
-      .map((item, idx) => [
-        String(idx + 1),
-        item.descripcion,
-        String(item.cantidad),
-        formatCLP(item.precioUnitario),
-        formatCLP(item.cantidad * item.precioUnitario),
-      ]),
-    theme: "striped",
-    headStyles: { fillColor: [21, 128, 61], fontSize: 9, fontStyle: "bold" },
-    bodyStyles: { fontSize: 9 },
-    columnStyles: {
-      0: { cellWidth: 10 },
-      2: { halign: "center", cellWidth: 15 },
-      3: { halign: "right", cellWidth: 35 },
-      4: { halign: "right", cellWidth: 35 },
-    },
-    margin: { left: 14, right: 14 },
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  y = (doc as any).lastAutoTable.finalY + 6;
-
-  // Totales
-  const colRight = W - 14;
-  const colLeft = W - 80;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("Subtotal Neto:", colLeft, y);
-  doc.text(formatCLP(neto), colRight, y, { align: "right" });
-  y += 5;
-  doc.text(`IVA (${cot.ivaPorcentaje}%):`, colLeft, y);
-  doc.text(formatCLP(iva), colRight, y, { align: "right" });
-  y += 5;
-  doc.setDrawColor(100);
-  doc.line(colLeft, y, colRight, y);
-  y += 4;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("TOTAL:", colLeft, y);
-  doc.text(formatCLP(total), colRight, y, { align: "right" });
-  y += 10;
-
-  // Notas
-  if (cot.notas) {
-    doc.setFontSize(9);
+    // Encabezado empresa
+    doc.setFontSize(15);
     doc.setFont("helvetica", "bold");
-    doc.text("Notas:", 14, y);
-    y += 5;
+    doc.text(EMPRESA.nombre, 14, y);
+    y += 7;
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    const lines = doc.splitTextToSize(cot.notas, W - 28);
-    doc.text(lines, 14, y);
-    y += lines.length * 4 + 4;
+    doc.text(`RUT: ${EMPRESA.rut}`, 14, y);
+    y += 4;
+    doc.text(EMPRESA.giro, 14, y);
+    y += 9;
+
+    // Título cotización
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(`COTIZACIÓN Nº ${cot.numero}`, 14, y);
+    y += 6;
+
+    // Fechas
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Fecha: ${format(new Date(cot.fecha), "dd/MM/yyyy")}`, 14, y);
+    doc.text(`Válida hasta: ${format(new Date(cot.vigencia), "dd/MM/yyyy")}`, 90, y);
+    doc.text(`Estado: ${ESTADO_CONFIG[cot.estado].label}`, W - 55, y);
+    y += 9;
+
+    // Línea
+    doc.setDrawColor(180);
+    doc.line(14, y, W - 14, y);
+    y += 6;
+
+    // Datos cliente
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("CLIENTE", 14, y);
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    if (cot.clienteNombre) { doc.text(`Razón Social: ${cot.clienteNombre}`, 14, y); y += 4; }
+    if (cot.clienteRut)    { doc.text(`RUT: ${cot.clienteRut}`, 14, y); y += 4; }
+    if (cot.clienteEmail)  { doc.text(`Email: ${cot.clienteEmail}`, 14, y); y += 4; }
+    if (cot.clienteDireccion) { doc.text(`Dirección: ${cot.clienteDireccion}`, 14, y); y += 4; }
+    y += 4;
+
+    // Tabla de ítems
+    const { neto, iva, total } = calcularTotales(cot.items, cot.ivaPorcentaje);
+
+    autoTable(doc, {
+      startY: y,
+      head: [["#", "Descripción", "Cant.", "P. Unit. Neto", "Subtotal Neto"]],
+      body: cot.items
+        .filter((i) => i.descripcion.trim() !== "")
+        .map((item, idx) => [
+          String(idx + 1),
+          item.descripcion,
+          String(item.cantidad),
+          formatCLP(item.precioUnitario),
+          formatCLP(item.cantidad * item.precioUnitario),
+        ]),
+      theme: "striped",
+      headStyles: { fillColor: [21, 128, 61], fontSize: 9, fontStyle: "bold" },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        2: { halign: "center", cellWidth: 15 },
+        3: { halign: "right", cellWidth: 35 },
+        4: { halign: "right", cellWidth: 35 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    y = (doc as any).lastAutoTable.finalY + 6;
+
+    // Totales
+    const colRight = W - 14;
+    const colLeft = W - 80;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("Subtotal Neto:", colLeft, y);
+    doc.text(formatCLP(neto), colRight, y, { align: "right" });
+    y += 5;
+    doc.text(`IVA (${cot.ivaPorcentaje}%):`, colLeft, y);
+    doc.text(formatCLP(iva), colRight, y, { align: "right" });
+    y += 5;
+    doc.setDrawColor(100);
+    doc.line(colLeft, y, colRight, y);
+    y += 4;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("TOTAL:", colLeft, y);
+    doc.text(formatCLP(total), colRight, y, { align: "right" });
+    y += 10;
+
+    // Notas
+    if (cot.notas) {
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("Notas:", 14, y);
+      y += 5;
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(cot.notas, W - 28);
+      doc.text(lines, 14, y);
+      y += lines.length * 4 + 4;
+    }
+
+    // Pie de página
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(130);
+    doc.text(
+      `Esta cotización es válida hasta el ${format(new Date(cot.vigencia), "dd/MM/yyyy")}. Precios en pesos chilenos.`,
+      14,
+      pageHeight - 12
+    );
+    doc.text(`${EMPRESA.nombre} | RUT ${EMPRESA.rut}`, 14, pageHeight - 8);
+
+    doc.save(`${cot.numero}.pdf`);
+  } catch (err) {
+    console.error("Error al generar PDF:", err);
+    alert("No se pudo generar el PDF. Intenta de nuevo.");
   }
-
-  // Pie de página
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "italic");
-  doc.setTextColor(130);
-  doc.text(
-    `Esta cotización es válida hasta el ${format(new Date(cot.vigencia), "dd/MM/yyyy")}. Precios en pesos chilenos.`,
-    14,
-    pageHeight - 12
-  );
-  doc.text(`${EMPRESA.nombre} | RUT ${EMPRESA.rut}`, 14, pageHeight - 8);
-
-  doc.save(`${cot.numero}.pdf`);
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -300,7 +304,7 @@ export default function Cotizaciones() {
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <FileText className="h-12 w-12 mb-3 opacity-30" />
               <p className="text-sm">Sin cotizaciones</p>
-              <p className="text-xs mt-1 opacity-70">Haz clic en "Nueva" para crear una</p>
+              <p className="text-xs mt-1 opacity-70">Haz clic en \"Nueva\" para crear una</p>
             </div>
           )}
 
