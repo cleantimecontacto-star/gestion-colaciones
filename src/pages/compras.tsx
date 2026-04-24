@@ -134,11 +134,11 @@ export default function Compras() {
   const sugerenciasConAccion = sugerencias.filter((s) => s.cajas > 0);
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full gap-4 min-w-0 max-w-full">
       <h2 className="text-xl font-bold tracking-tight px-1">Optimizador de Compras</h2>
 
-      <ScrollArea className="flex-1 -mx-2 px-2">
-        <div className="space-y-6 pb-6">
+      <ScrollArea className="flex-1 min-w-0 max-w-full">
+        <div className="space-y-6 pb-6 min-w-0 max-w-full">
           {/* Sugerencia de compra */}
           <Card className="shadow-sm border-primary/30 bg-primary/5">
             <CardHeader className="p-3 pb-2">
@@ -179,14 +179,15 @@ export default function Compras() {
                   {sugerencias.map((s) => (
                     <div
                       key={s.cat}
-                      className="rounded-md bg-background border border-border/50 p-2.5 text-xs"
+                      className="rounded-md bg-background border border-border/50 p-2.5 text-xs min-w-0"
                       data-testid={`sugerencia-${s.cat}`}
                     >
-                      <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
                         <span className="font-semibold text-sm">{s.cat}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          Stock: <strong className="text-foreground">{s.stockActual}</strong> /
-                          Necesita: <strong className="text-foreground">{Math.ceil(s.requerido)}</strong>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          Stock <strong className="text-foreground">{s.stockActual}</strong>
+                          {" · "}
+                          Nec. <strong className="text-foreground">{Math.ceil(s.requerido)}</strong>
                         </span>
                       </div>
                       {s.faltante <= 0 ? (
@@ -199,24 +200,24 @@ export default function Compras() {
                           Faltan {Math.ceil(s.faltante)} un. — sin proveedores con esta categoría.
                         </div>
                       ) : (
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium truncate">
+                            <div className="font-medium break-words">
                               {s.cajas}× {s.mejor.nombre}
                             </div>
-                            <div className="text-[10px] text-muted-foreground">
+                            <div className="text-[10px] text-muted-foreground break-words">
                               {s.mejor.proveedorNombre} • {s.unidadesCubiertas} un. (cubre faltante de {Math.ceil(s.faltante)})
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-right">
-                              <div className="font-bold text-primary">{formatCLP(s.costoTotal)}</div>
-                              <div className="text-[10px] text-muted-foreground">Neto: {formatCLP(s.costoNeto)}</div>
+                          <div className="flex items-center justify-between sm:justify-end gap-2 min-w-0">
+                            <div className="text-right min-w-0">
+                              <div className="font-bold text-primary whitespace-nowrap">{formatCLP(s.costoTotal)}</div>
+                              <div className="text-[10px] text-muted-foreground whitespace-nowrap">Neto: {formatCLP(s.costoNeto)}</div>
                             </div>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px]"
+                              className="h-7 text-[11px] shrink-0"
                               onClick={() => registrarUnaSugerencia(s)}
                               data-testid={`button-comprar-${s.cat}`}
                             >
@@ -269,33 +270,33 @@ export default function Compras() {
                     {allProducts.map((prod, idx) => (
                       <div
                         key={prod.id}
-                        className={`p-3 flex items-center justify-between text-sm ${
+                        className={`p-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 text-sm min-w-0 ${
                           idx === 0 ? "bg-primary/5" : ""
                         }`}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium flex items-center gap-2">
-                            <span className="truncate">{prod.nombre}</span>
+                          <div className="font-medium flex items-center gap-2 flex-wrap">
+                            <span className="break-words">{prod.nombre}</span>
                             {idx === 0 && (
                               <Badge variant="default" className="text-[10px] h-4 px-1 py-0 shrink-0">
                                 Mejor opción
                               </Badge>
                             )}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
+                          <div className="text-xs text-muted-foreground mt-0.5 break-words">
                             {prod.proveedorNombre} • Rinde {prod.unidades} un.
                           </div>
                         </div>
-                        <div className="text-right shrink-0 ml-2">
-                          <div className="font-bold text-primary">
+                        <div className="text-left sm:text-right shrink-0 sm:ml-2 min-w-0 max-w-full">
+                          <div className="font-bold text-primary break-words">
                             {formatCLP(prod.costoUnitario)}{" "}
                             <span className="text-[10px] font-normal text-muted-foreground">/un c/IVA</span>
                           </div>
-                          <div className="text-[10px] text-muted-foreground">
+                          <div className="text-[10px] text-muted-foreground break-words">
                             Neto/un: {formatCLP(prod.costoUnitarioNeto)}
                           </div>
-                          <div className="text-xs text-muted-foreground flex items-center justify-end gap-1 mt-0.5">
-                            Caja:{" "}
+                          <div className="text-xs text-muted-foreground flex items-center sm:justify-end gap-1 mt-0.5 flex-wrap">
+                            <span>Caja:</span>
                             <EditableNumber
                               value={prod.precio}
                               onChange={(val) =>
@@ -305,9 +306,9 @@ export default function Compras() {
                               }
                               isCurrency
                             />
-                            {prod.precioIncluyeIva ? "(c/IVA)" : "(Neto)"}
+                            <span>{prod.precioIncluyeIva ? "(c/IVA)" : "(Neto)"}</span>
                           </div>
-                          <div className="text-[10px] text-muted-foreground">
+                          <div className="text-[10px] text-muted-foreground break-words">
                             Neto: {formatCLP(prod.precioNeto)} · c/IVA: {formatCLP(prod.precioTotal)}
                           </div>
                         </div>
