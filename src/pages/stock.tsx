@@ -139,7 +139,7 @@ export default function Stock() {
         </Dialog>
       </div>
 
-      <ScrollArea className="flex-1 -mx-2 px-2">
+      <ScrollArea className="flex-1 min-w-0 max-w-full">
         <div className="grid gap-3 pb-6">
           {categorias.length === 0 && (
             <Card className="shadow-sm">
