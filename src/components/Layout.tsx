@@ -3,7 +3,8 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, ShoppingCart, Users, Package,
-  History, Settings, Wifi, WifiOff, FileText, Download, CheckCircle2,
+  History, Settings, Wifi, WifiOff, FileText, Download,
+  CheckCircle2, X, Smartphone, Monitor,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -23,36 +24,42 @@ const TABS = [
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
-  const [installed, setInstalled] = useState(false);
   const deferredPrompt = useRef<any>(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+
+  // Detectar plataforma
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as any).standalone === true;
 
   useEffect(() => {
+    if (isStandalone) {
+      setIsInstalled(true);
+      return;
+    }
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Escuchar evento de instalación PWA
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
       deferredPrompt.current = e;
-      setInstallPrompt(e);
+      setCanInstall(true);
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
 
-    // Detectar si ya está instalada
     const handleAppInstalled = () => {
-      setInstalled(true);
-      setInstallPrompt(null);
+      setIsInstalled(true);
+      setCanInstall(false);
       deferredPrompt.current = null;
     };
     window.addEventListener("appinstalled", handleAppInstalled);
-
-    // También detectar si ya corre como PWA standalone
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setInstalled(true);
-    }
 
     return () => {
       window.removeEventListener("online", handleOnline);
@@ -62,15 +69,42 @@ export function Layout({ children }: LayoutProps) {
     };
   }, []);
 
-  const handleInstall = async () => {
-    if (!deferredPrompt.current) return;
-    deferredPrompt.current.prompt();
-    const { outcome } = await deferredPrompt.current.userChoice;
-    if (outcome === "accepted") {
-      setInstalled(true);
-      setInstallPrompt(null);
-      deferredPrompt.current = null;
+  const handleInstallClick = async () => {
+    if (deferredPrompt.current) {
+      // Chrome/Edge — instalar directamente
+      deferredPrompt.current.prompt();
+      const { outcome } = await deferredPrompt.current.userChoice;
+      if (outcome === "accepted") {
+        setIsInstalled(true);
+        setCanInstall(false);
+        deferredPrompt.current = null;
+      }
+    } else {
+      // Safari/iOS/otros — mostrar instrucciones
+      setShowModal(true);
     }
+  };
+
+  const InstallButton = ({ mobile = false }: { mobile?: boolean }) => {
+    if (isInstalled) {
+      return (
+        <div className={`flex items-center gap-1.5 text-green-600 font-medium ${mobile ? "text-xs" : "text-sm px-3 py-2"}`}>
+          <CheckCircle2 className={mobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
+          {mobile ? "Instalada" : "App instalada"}
+        </div>
+      );
+    }
+    return (
+      <button
+        onClick={handleInstallClick}
+        className={`flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors ${
+          mobile ? "px-2 py-1.5 text-xs" : "w-full justify-center px-3 py-2 text-sm"
+        }`}
+      >
+        <Download className={mobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        {mobile ? "Instalar" : "Instalar app"}
+      </button>
+    );
   };
 
   return (
@@ -88,11 +122,10 @@ export function Layout({ children }: LayoutProps) {
               <div>RUT 77.875.974-8</div>
             </div>
           </div>
-          {isOnline ? (
-            <div className="h-2 w-2 rounded-full bg-green-500 shrink-0" title="Online" />
-          ) : (
-            <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" title="Offline" />
-          )}
+          <div
+            className={`h-2 w-2 rounded-full shrink-0 ${isOnline ? "bg-green-500" : "bg-red-500"}`}
+            title={isOnline ? "Online" : "Offline"}
+          />
         </div>
 
         <nav className="flex-1 p-2 space-y-1">
@@ -120,26 +153,13 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        {/* Botón instalar PWA — desktop */}
+        {/* Botón instalar — siempre visible en desktop */}
         <div className="p-3 border-t border-border">
-          {installed ? (
-            <div className="flex items-center gap-2 px-3 py-2 text-xs text-green-600 font-medium">
-              <CheckCircle2 className="h-4 w-4" />
-              App instalada
-            </div>
-          ) : installPrompt ? (
-            <button
-              onClick={handleInstall}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              <Download className="h-4 w-4" />
-              Instalar en PC
-            </button>
-          ) : null}
+          <InstallButton />
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-3 border-b border-border bg-card shrink-0">
@@ -153,22 +173,8 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Botón instalar PWA — móvil */}
-            {!installed && installPrompt && (
-              <button
-                onClick={handleInstall}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Instalar
-              </button>
-            )}
-            {installed && (
-              <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Instalada
-              </div>
-            )}
+            {/* Botón instalar — siempre visible en móvil */}
+            <InstallButton mobile />
             {isOnline ? (
               <Wifi className="h-4 w-4 text-green-500" />
             ) : (
@@ -177,7 +183,6 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        {/* Scrollable content area - internal scroll only */}
         <div className="flex-1 overflow-hidden bg-background">
           <div className="h-full overflow-y-auto p-2 md:p-4 pb-24 md:pb-4">
             {children}
@@ -214,6 +219,70 @@ export function Layout({ children }: LayoutProps) {
           );
         })}
       </nav>
+
+      {/* Modal instrucciones instalación */}
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm p-6 relative">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
+              Instalar Serendipia
+            </h2>
+
+            {isIOS || isSafari ? (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <div className="flex items-start gap-3">
+                  <Smartphone className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-foreground mb-1">iPhone / iPad (Safari)</p>
+                    <ol className="space-y-1 list-decimal ml-4">
+                      <li>Toca el botón <strong>Compartir</strong> (cuadrado con flecha ↑) en la barra inferior</li>
+                      <li>Desplázate y toca <strong>"Agregar a pantalla de inicio"</strong></li>
+                      <li>Toca <strong>Agregar</strong></li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <div className="flex items-start gap-3">
+                  <Monitor className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-foreground mb-1">PC (Chrome / Edge)</p>
+                    <ol className="space-y-1 list-decimal ml-4">
+                      <li>Haz clic en el ícono <strong>⊕</strong> en la barra de dirección (arriba a la derecha)</li>
+                      <li>Haz clic en <strong>"Instalar"</strong></li>
+                    </ol>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Smartphone className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-foreground mb-1">Android (Chrome)</p>
+                    <ol className="space-y-1 list-decimal ml-4">
+                      <li>Toca el menú <strong>⋮</strong> (tres puntos arriba)</li>
+                      <li>Toca <strong>"Agregar a pantalla de inicio"</strong></li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowModal(false)}
+              className="mt-5 w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
