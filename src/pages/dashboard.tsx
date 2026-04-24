@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useStore } from "@/store";
+import { useStore, diasPorEntregaCliente } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCLP } from "@/lib/format";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -80,7 +80,7 @@ export default function Dashboard() {
     clientes.reduce((sum, c) => sum + (c.config[cat] || 0) * Math.max(0, c.diasEntrega), 0);
 
   const demandaEntregaCat = (cat: string) =>
-    clientes.reduce((sum, c) => sum + (c.config[cat] || 0) * Math.max(1, c.diasEntrega / 2), 0);
+    clientes.reduce((sum, c) => sum + (c.config[cat] || 0) * diasPorEntregaCliente(c), 0);
 
   const niveles = categorias.map((cat) => {
     const actual = stock[cat] ?? 0;
