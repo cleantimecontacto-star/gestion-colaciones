@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
+import { Pencil } from "lucide-react";
 
 interface EditableTextProps {
   value: string;
@@ -29,7 +30,7 @@ export function EditableText({ value, onChange, className = "" }: EditableTextPr
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleBlur();
     } else if (e.key === "Escape") {
@@ -42,24 +43,25 @@ export function EditableText({ value, onChange, className = "" }: EditableTextPr
     return (
       <Input
         ref={inputRef}
-        className={`h-7 px-1 py-0 text-sm min-w-[100px] w-full ${className}`}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
+        className="h-7 text-sm"
       />
     );
   }
 
   return (
     <span
-      className={`cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 px-1 rounded transition-colors break-words ${className}`}
+      className={`inline-flex items-center gap-1 cursor-pointer group ${className}`}
       onClick={() => {
         setInputValue(value);
         setIsEditing(true);
       }}
     >
-      {value}
+      <span>{value}</span>
+      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </span>
   );
 }

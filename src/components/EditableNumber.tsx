@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { formatCLP, parseCLP } from "@/lib/format";
+import { Pencil } from "lucide-react";
 
 interface EditableNumberProps {
   value: number;
@@ -29,7 +30,7 @@ export function EditableNumber({ value, onChange, isCurrency = false, className 
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleBlur();
     } else if (e.key === "Escape") {
@@ -41,24 +42,25 @@ export function EditableNumber({ value, onChange, isCurrency = false, className 
     return (
       <Input
         ref={inputRef}
-        className={`h-7 px-1 py-0 text-sm font-medium min-w-[60px] text-right w-full ${className}`}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
+        className="h-7 w-28 text-sm"
       />
     );
   }
 
   return (
     <span
-      className={`cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 px-1 rounded transition-colors ${className}`}
+      className={`inline-flex items-center gap-1 cursor-pointer group ${className}`}
       onClick={() => {
-        setInputValue(isCurrency ? value.toString() : value.toString()); // If they want pure number editing
+        setInputValue(value.toString());
         setIsEditing(true);
       }}
     >
-      {isCurrency ? formatCLP(value) : value}
+      <span>{isCurrency ? formatCLP(value) : value}</span>
+      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </span>
   );
 }
