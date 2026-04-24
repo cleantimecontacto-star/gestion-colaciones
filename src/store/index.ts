@@ -64,12 +64,37 @@ export interface Transaccion {
   clienteId?: string;
 }
 
+export type EstadoCotizacion = "borrador" | "enviada" | "aceptada" | "rechazada";
+
+export interface ItemCotizacion {
+  id: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number; // neto
+}
+
+export interface Cotizacion {
+  id: string;
+  numero: string;
+  fecha: string; // ISO
+  vigencia: string; // ISO
+  clienteNombre: string;
+  clienteRut: string;
+  clienteEmail: string;
+  clienteDireccion: string;
+  items: ItemCotizacion[];
+  estado: EstadoCotizacion;
+  notas: string;
+  ivaPorcentaje: number;
+}
+
 export interface AppState {
   ivaPorcentaje: number;
   proveedores: Proveedor[];
   clientes: Cliente[];
   stock: Stock;
   historial: Transaccion[];
+  cotizaciones: Cotizacion[];
   
   // Actions
   setIva: (iva: number) => void;
@@ -100,6 +125,11 @@ export interface AppState {
   updateTransaccion: (id: string, data: Partial<Pick<Transaccion, "montoTotal" | "detalles" | "fecha">>) => void;
   removeTransaccion: (id: string) => void;
   
+  // Cotizaciones
+  addCotizacion: (c: Cotizacion) => void;
+  updateCotizacion: (id: string, data: Partial<Cotizacion>) => void;
+  removeCotizacion: (id: string) => void;
+
   // Reset
   resetToDefaults: () => void;
 }
@@ -162,7 +192,8 @@ const generateInitialState = () => ({
   proveedores: DEFAULT_PROVEEDORES,
   clientes: DEFAULT_CLIENTES,
   stock: { fruta: 0, snack: 0, barra: 0 },
-  historial: []
+  historial: [],
+  cotizaciones: [] as Cotizacion[],
 });
 
 export const useStore = create<AppState>()(
@@ -381,12 +412,20 @@ export const useStore = create<AppState>()(
           },
         };
       }),
-      
+
+      addCotizacion: (c) => set((state) => ({ cotizaciones: [c, ...state.cotizaciones] })),
+      updateCotizacion: (id, data) => set((state) => ({
+        cotizaciones: state.cotizaciones.map(c => c.id === id ? { ...c, ...data } : c)
+      })),
+      removeCotizacion: (id) => set((state) => ({
+        cotizaciones: state.cotizaciones.filter(c => c.id !== id)
+      })),
+
       resetToDefaults: () => set(generateInitialState()),
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 2,
+      version: 3,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> | undefined;
         if (!state) return persistedState as unknown as AppState;
@@ -403,6 +442,9 @@ export const useStore = create<AppState>()(
               },
             } as Cliente;
           });
+        }
+        if (version < 3) {
+          (state as Partial<AppState>).cotizaciones = (state as Partial<AppState>).cotizaciones ?? [];
         }
         return state as AppState;
       },

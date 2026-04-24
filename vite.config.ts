@@ -35,9 +35,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "Gestión Colaciones",
-        short_name: "Colaciones",
-        description: "Gestor de colaciones para empresas",
+        name: "Serendipia",
+        short_name: "Serendipia",
+        description: "Gestión comercial SerendipiaVK SpA",
         theme_color: "#15803d",
         background_color: "#f0fdf4",
         display: "standalone",
