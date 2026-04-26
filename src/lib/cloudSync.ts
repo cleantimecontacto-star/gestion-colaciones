@@ -15,7 +15,12 @@ import { useSyncStatus } from "./syncStatus";
 const CLOUD_TS_KEY = "gc_cloud_ts";
 const PERSIST_KEY = "gestion-colaciones-storage";
 
-const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string | undefined) ?? "";
+// URL de Convex. Si VITE_CONVEX_URL no está definida (p.ej. olvido en Vercel),
+// usamos la URL pública del backend compartido como fallback. Para desactivar
+// la sincronización por completo, definir VITE_CONVEX_URL="" en Vercel.
+const CONVEX_URL =
+  (import.meta.env.VITE_CONVEX_URL as string | undefined) ??
+  "https://polite-ocelot-652.eu-west-1.convex.cloud";
 
 type SyncableState = Pick<
   AppState,
@@ -122,7 +127,7 @@ export function setupCloudSync(): { enabled: boolean } {
     const stateBeforePull = pickSyncable(useStore.getState());
 
     try {
-      const resp = (await client.query("state:getState" as any, {})) as {
+      const resp = (await client.query("colaciones:getState" as any, {})) as {
         data: SyncableState | null;
         ts: number;
       };
@@ -179,7 +184,7 @@ export function setupCloudSync(): { enabled: boolean } {
       }
       setSyncing();
       const ts = Date.now();
-      const result = (await client.mutation("state:setState" as any, {
+      const result = (await client.mutation("colaciones:setState" as any, {
         data,
         ts,
       })) as { ok: boolean; ts: number };
@@ -188,7 +193,7 @@ export function setupCloudSync(): { enabled: boolean } {
         lastUploaded = serialized;
         setIdle();
       } else if (result?.ts) {
-        const fresh = (await client.query("state:getState" as any, {})) as {
+        const fresh = (await client.query("colaciones:getState" as any, {})) as {
           data: SyncableState | null;
           ts: number;
         };
