@@ -115,7 +115,7 @@ export default function Stock() {
                 >
                   <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                   <SelectContent>
-                    {selectedProv?.productos.map((p) => (
+                    {selectedProv?.productos.filter((p) => !p.agotado).map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.nombre} - {formatCLP(p.precio)} {p.precioIncluyeIva ? "(c/IVA)" : "(Neto)"}
                       </SelectItem>
