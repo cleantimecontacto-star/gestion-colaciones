@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Download, Edit2, FileText } from "lucide-react";
+import { Plus, Trash2, Download, Edit2, FileText, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import logoSerendipia from "@/assets/logo-serendipia.png";
 import {
   AlertDialog,
@@ -319,6 +320,71 @@ export default function Cotizaciones() {
     setDialogOpen(true);
   }
 
+  function exportarExcel() {
+    if (cotizaciones.length === 0) return;
+
+    const round = (n: number) => Math.round(n);
+    const fechaFmt = (iso: string) => format(new Date(iso), "dd-MM-yyyy");
+
+    const resumenRows = cotizaciones.map((c) => {
+      const { neto, iva, total } = calcularTotales(c.items, c.ivaPorcentaje);
+      return {
+        Número: c.numero,
+        Fecha: fechaFmt(c.fecha),
+        "Válida hasta": fechaFmt(c.vigencia),
+        Estado: ESTADO_CONFIG[c.estado].label,
+        Cliente: c.clienteNombre,
+        RUT: c.clienteRut,
+        Email: c.clienteEmail,
+        Dirección: c.clienteDireccion,
+        "IVA %": c.ivaPorcentaje,
+        Neto: round(neto),
+        IVA: round(iva),
+        Total: round(total),
+        Notas: c.notas,
+      };
+    });
+
+    const itemsRows: Record<string, string | number>[] = [];
+    cotizaciones.forEach((c) => {
+      c.items
+        .filter((it) => it.descripcion.trim() !== "")
+        .forEach((it, idx) => {
+          itemsRows.push({
+            Cotización: c.numero,
+            Cliente: c.clienteNombre,
+            Fecha: fechaFmt(c.fecha),
+            Estado: ESTADO_CONFIG[c.estado].label,
+            "#": idx + 1,
+            Descripción: it.descripcion,
+            Cantidad: it.cantidad,
+            "P. Unit. Neto": round(it.precioUnitario),
+            "Subtotal Neto": round(it.cantidad * it.precioUnitario),
+          });
+        });
+    });
+
+    const totalesPorEstado = (["borrador", "enviada", "aceptada", "rechazada"] as const).map((est) => {
+      const lista = cotizaciones.filter((c) => c.estado === est);
+      const sumaTotal = lista.reduce((a, c) => {
+        const { total } = calcularTotales(c.items, c.ivaPorcentaje);
+        return a + total;
+      }, 0);
+      return {
+        Estado: ESTADO_CONFIG[est].label,
+        Cantidad: lista.length,
+        "Monto total (c/IVA)": round(sumaTotal),
+      };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), "Cotizaciones");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itemsRows), "Ítems detallados");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(totalesPorEstado), "Totales por estado");
+
+    XLSX.writeFile(wb, `cotizaciones-serendipia-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  }
+
   function abrirEditar(cot: Cotizacion) {
     setEditingId(cot.id);
     const { id: _id, ...rest } = cot;
@@ -363,12 +429,25 @@ export default function Cotizaciones() {
   return (
     <div className="flex flex-col h-full gap-3">
       {/* Header */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-1 gap-2">
         <h2 className="text-xl font-bold tracking-tight">Cotizaciones</h2>
-        <Button size="sm" onClick={abrirNueva}>
-          <Plus className="h-4 w-4 mr-1" />
-          Nueva
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            onClick={exportarExcel}
+            disabled={cotizaciones.length === 0}
+            title="Exportar todas las cotizaciones a Excel"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">Excel</span>
+          </Button>
+          <Button size="sm" onClick={abrirNueva}>
+            <Plus className="h-4 w-4 mr-1" />
+            Nueva
+          </Button>
+        </div>
       </div>
 
       {/* Filtros de estado */}
