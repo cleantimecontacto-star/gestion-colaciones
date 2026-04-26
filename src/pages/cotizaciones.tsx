@@ -29,6 +29,7 @@ const EMPRESA = {
   nombre: "Comercializadora SerendipiaVK SpA",
   rut: "77.875.974-8",
   giro: "Comercialización de colaciones y alimentación laboral",
+  telefono: "+56 9 5239 6823",
 };
 
 const ESTADO_CONFIG: Record<EstadoCotizacion, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
@@ -122,6 +123,8 @@ async function descargarPDF(cot: Cotizacion) {
     doc.text(`RUT: ${EMPRESA.rut}`, textX, y);
     y += 4;
     doc.text(EMPRESA.giro, textX, y);
+    y += 4;
+    doc.text(`Tel: ${EMPRESA.telefono}`, textX, y);
     y += 9;
     if (logo && y < 18 + logoSize - 4) y = 18 + logoSize - 4;
 
@@ -229,7 +232,7 @@ async function descargarPDF(cot: Cotizacion) {
       14,
       pageHeight - 12
     );
-    doc.text(`${EMPRESA.nombre} | RUT ${EMPRESA.rut}`, 14, pageHeight - 8);
+    doc.text(`${EMPRESA.nombre} | RUT ${EMPRESA.rut} | Tel ${EMPRESA.telefono}`, 14, pageHeight - 8);
 
     doc.save(`${cot.numero}.pdf`);
   } catch (err) {
