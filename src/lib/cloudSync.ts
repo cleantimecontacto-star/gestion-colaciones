@@ -78,7 +78,12 @@ export function setupCloudSync(): { enabled: boolean } {
 
   const client = new ConvexHttpClient(CONVEX_URL);
 
-  let suppressUpload = false;
+  // suppressUpload bloquea uploads durante la bajada inicial e
+  // inmediatamente después de aplicar datos de la nube al store local.
+  // Esto evita que datos viejos del localStorage sobrescriban datos
+  // más nuevos de la nube por una condición de carrera al arrancar.
+  let suppressUpload = true;
+  let initialPullDone = false;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let lastUploaded = "";
 
@@ -121,14 +126,22 @@ export function setupCloudSync(): { enabled: boolean } {
         lastUploaded = JSON.stringify(resp.data);
         setIdle();
         console.info("[cloudSync] Datos descargados de la nube");
-      } else if (myTs > 0) {
+      } else if (myTs > 0 || cloudTs === 0) {
+        // Subir lo nuestro como fuente o como semilla
+        // (sólo después de habilitar uploads)
+        suppressUpload = false;
+        initialPullDone = true;
         await pushNow();
-      } else {
-        await pushNow();
+        return;
       }
     } catch (e) {
       console.warn("[cloudSync] Error al descargar:", e);
       setError(e);
+    } finally {
+      // Habilitar uploads de cambios del usuario sólo DESPUÉS
+      // de que la bajada inicial haya terminado.
+      suppressUpload = false;
+      initialPullDone = true;
     }
   };
 
@@ -171,7 +184,7 @@ export function setupCloudSync(): { enabled: boolean } {
   };
 
   const scheduleUpload = () => {
-    if (suppressUpload) return;
+    if (suppressUpload || !initialPullDone) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       void pushNow();
