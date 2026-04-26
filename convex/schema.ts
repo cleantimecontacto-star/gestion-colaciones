@@ -2,7 +2,18 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Empresa - singleton (only 1 row at a time)
+  /**
+   * Estado completo de la app, guardado como JSON.
+   * Único registro con id "default" (singleton).
+   * Se reemplaza en cada cambio (last-write-wins por timestamp).
+   */
+  appState: defineTable({
+    docId: v.string(),
+    data: v.any(),
+    ts: v.number(),
+  }).index("by_doc", ["docId"]),
+
+  // Tablas reservadas para futura migración granular (no usadas todavía)
   empresa: defineTable({
     nombre: v.string(),
     rut: v.string(),
@@ -12,25 +23,17 @@ export default defineSchema({
     direccion: v.optional(v.string()),
     logoDataUrl: v.optional(v.string()),
   }),
-
-  // Configuración global key/value (ej: ivaPorcentaje)
   settings: defineTable({
     key: v.string(),
     value: v.any(),
   }).index("by_key", ["key"]),
-
-  // Categorías
   categorias: defineTable({
     nombre: v.string(),
   }).index("by_nombre", ["nombre"]),
-
-  // Stock por categoría
   stock: defineTable({
     categoria: v.string(),
     cantidad: v.number(),
   }).index("by_categoria", ["categoria"]),
-
-  // Proveedores con productos anidados
   proveedores: defineTable({
     nombre: v.string(),
     despachoBase: v.number(),
@@ -48,8 +51,6 @@ export default defineSchema({
       })
     ),
   }),
-
-  // Clientes
   clientes: defineTable({
     nombre: v.string(),
     rut: v.optional(v.string()),
@@ -57,10 +58,10 @@ export default defineSchema({
     telefono: v.optional(v.string()),
     direccion: v.optional(v.string()),
     laboral: v.optional(v.string()),
-    config: v.any(), // Record<string, number>
+    config: v.any(),
     diasEntrega: v.number(),
     entregasPorSemana: v.number(),
-    precios: v.any(), // Record<string, number>
+    precios: v.any(),
     modoCobro: v.union(v.literal("unitario"), v.literal("paquete")),
     paquete: v.object({
       unidades: v.number(),
@@ -68,8 +69,6 @@ export default defineSchema({
       ivaIncluido: v.boolean(),
     }),
   }),
-
-  // Historial de transacciones
   historial: defineTable({
     tipo: v.union(
       v.literal("compra"),
@@ -84,8 +83,6 @@ export default defineSchema({
     stockDelta: v.optional(v.any()),
     clienteId: v.optional(v.string()),
   }).index("by_fecha", ["fecha"]),
-
-  // Cotizaciones
   cotizaciones: defineTable({
     numero: v.string(),
     fecha: v.string(),
