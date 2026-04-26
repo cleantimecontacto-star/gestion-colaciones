@@ -77,6 +77,7 @@ export default function Ventas() {
 
   const [customCliente, setCustomCliente] = useState<Cliente | null>(null);
   const [customUnidades, setCustomUnidades] = useState<Record<string, number>>({});
+  const [customMontoNeto, setCustomMontoNeto] = useState<number>(0);
 
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [nuevo, setNuevo] = useState<NuevoClienteForm>(() => buildDefaultNuevo(categorias));
@@ -165,6 +166,13 @@ export default function Ventas() {
     });
     setCustomCliente(cliente);
     setCustomUnidades(inicial);
+    // Precargar monto neto con el valor estándar de la entrega
+    if (cliente.modoCobro === "paquete") {
+      const netoDia = cliente.paquete.ivaIncluido
+        ? cliente.paquete.montoNeto / (1 + ivaPorcentaje / 100)
+        : cliente.paquete.montoNeto;
+      setCustomMontoNeto(Math.round(netoDia * diasPorEntrega));
+    }
   };
 
   const setCustomCat = (cat: string, val: number) =>
@@ -191,7 +199,8 @@ export default function Ventas() {
       });
       return;
     }
-    registrarVentaPersonalizada(customCliente.id, customUnidades);
+    const montoOverride = customCliente.modoCobro === "paquete" ? customMontoNeto : undefined;
+    registrarVentaPersonalizada(customCliente.id, customUnidades, montoOverride);
     const detalle = Object.entries(customUnidades)
       .filter(([, v]) => v > 0)
       .map(([cat, v]) => `${v} ${cat}`)
@@ -212,17 +221,8 @@ export default function Ventas() {
         0
       );
     }
-    // Modo paquete: cobro proporcional a las unidades respecto a la entrega estándar
-    const diasPorEntrega = diasPorEntregaCliente(customCliente);
-    const unidadesEstandarEntrega = (customCliente.paquete.unidades || 0) * diasPorEntrega;
-    const unidadesEntregadas = Object.values(customUnidades).reduce((a, b) => a + b, 0);
-    const factor =
-      unidadesEstandarEntrega > 0 ? unidadesEntregadas / unidadesEstandarEntrega : 1;
-    const netoDia = customCliente.paquete.ivaIncluido
-      ? customCliente.paquete.montoNeto / (1 + ivaPorcentaje / 100)
-      : customCliente.paquete.montoNeto;
-    const netoEntrega = netoDia * diasPorEntrega * factor;
-    return netoEntrega * (1 + ivaPorcentaje / 100);
+    // Modo paquete: usar el monto neto editado por el usuario
+    return customMontoNeto * (1 + ivaPorcentaje / 100);
   })();
 
   const colsCount = Math.min(categorias.length, 4);
@@ -504,7 +504,7 @@ export default function Ventas() {
             <DialogTitle>Entrega personalizada</DialogTitle>
             <DialogDescription>
               {customCliente?.modoCobro === "paquete"
-                ? `Ajusta la mezcla y la cantidad para ${customCliente?.nombre}. El cobro se ajusta proporcionalmente a las unidades entregadas.`
+                ? `Ajusta la mezcla y el monto a cobrar para ${customCliente?.nombre}.`
                 : `Ingresa las unidades exactas de esta entrega para ${customCliente?.nombre}.`}
             </DialogDescription>
           </DialogHeader>
@@ -548,9 +548,28 @@ export default function Ventas() {
             ))}
           </div>
 
+          {customCliente?.modoCobro === "paquete" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="custom-monto-neto" className="text-xs font-medium">
+                Monto neto a cobrar
+              </Label>
+              <Input
+                id="custom-monto-neto"
+                type="number"
+                min={0}
+                value={customMontoNeto}
+                onChange={(e) => setCustomMontoNeto(Math.max(0, Number(e.target.value) || 0))}
+                data-testid="input-custom-monto-neto"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Valor precargado según el acuerdo con el cliente. Edítalo si este día cobras diferente.
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-between items-center bg-primary/5 rounded p-2 border border-primary/10">
             <div className="text-xs font-medium text-muted-foreground">
-              {customCliente?.modoCobro === "paquete" ? "Cobro proporcional" : "Total entrega"}
+              {customCliente?.modoCobro === "paquete" ? "Total c/IVA" : "Total entrega"}
             </div>
             <div className="font-bold text-base text-primary">{formatCLP(customTotalBruto)}</div>
           </div>

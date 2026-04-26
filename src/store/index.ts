@@ -141,7 +141,7 @@ export interface AppState {
   // Transacciones
   registrarCompra: (montoNeto: number, iva: number, montoTotal: number, detalles: string, itemsStock: Record<string, number>) => void;
   registrarVenta: (clienteId: string) => void;
-  registrarVentaPersonalizada: (clienteId: string, unidades: Record<string, number>) => void;
+  registrarVentaPersonalizada: (clienteId: string, unidades: Record<string, number>, montoNetoOverride?: number) => void;
   updateTransaccion: (id: string, data: Partial<Pick<Transaccion, "montoTotal" | "detalles" | "fecha">>) => void;
   removeTransaccion: (id: string) => void;
 
@@ -521,7 +521,7 @@ export const useStore = create<AppState>()(
           };
         }),
 
-      registrarVentaPersonalizada: (clienteId, unidades) =>
+      registrarVentaPersonalizada: (clienteId, unidades, montoNetoOverride) =>
         set((state) => {
           const cliente = state.clientes.find((c) => c.id === clienteId);
           if (!cliente) return state;
@@ -537,23 +537,28 @@ export const useStore = create<AppState>()(
           let ivaMonto: number;
 
           if (cliente.modoCobro === "paquete") {
-            // Cobro proporcional al total de unidades respecto a la entrega estándar.
-            const diasPorEntrega = diasPorEntregaCliente(cliente);
-            const unidadesEstandarEntrega = (cliente.paquete.unidades || 0) * diasPorEntrega;
-            const unidadesEntregadas = Object.values(unidadesLimpias).reduce(
-              (a, b) => a + b,
-              0
-            );
-            const factor =
-              unidadesEstandarEntrega > 0
-                ? unidadesEntregadas / unidadesEstandarEntrega
-                : 1;
+            if (montoNetoOverride !== undefined && montoNetoOverride >= 0) {
+              // Usar el monto neto ingresado manualmente por el usuario
+              neto = montoNetoOverride;
+            } else {
+              // Cobro proporcional al total de unidades respecto a la entrega estándar.
+              const diasPorEntrega = diasPorEntregaCliente(cliente);
+              const unidadesEstandarEntrega = (cliente.paquete.unidades || 0) * diasPorEntrega;
+              const unidadesEntregadas = Object.values(unidadesLimpias).reduce(
+                (a, b) => a + b,
+                0
+              );
+              const factor =
+                unidadesEstandarEntrega > 0
+                  ? unidadesEntregadas / unidadesEstandarEntrega
+                  : 1;
 
-            const netoEstandarEntrega = cliente.paquete.ivaIncluido
-              ? (cliente.paquete.montoNeto / (1 + ivaPct / 100)) * diasPorEntrega
-              : cliente.paquete.montoNeto * diasPorEntrega;
+              const netoEstandarEntrega = cliente.paquete.ivaIncluido
+                ? (cliente.paquete.montoNeto / (1 + ivaPct / 100)) * diasPorEntrega
+                : cliente.paquete.montoNeto * diasPorEntrega;
 
-            neto = netoEstandarEntrega * factor;
+              neto = netoEstandarEntrega * factor;
+            }
             ivaMonto = neto * (ivaPct / 100);
             totalBruto = neto + ivaMonto;
           } else {
