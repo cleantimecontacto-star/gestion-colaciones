@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Download, Edit2, FileText } from "lucide-react";
+import logoSerendipia from "@/assets/logo-serendipia.png";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +73,24 @@ const emptyForm = (ivaPorcentaje: number, cotizaciones: Cotizacion[]): Omit<Coti
 
 // ─── PDF ──────────────────────────────────────────────────────────────────────
 
+let _logoDataUrl: string | null = null;
+async function getLogoDataUrl(): Promise<string | null> {
+  if (_logoDataUrl) return _logoDataUrl;
+  try {
+    const res = await fetch(logoSerendipia);
+    const blob = await res.blob();
+    _logoDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    return _logoDataUrl;
+  } catch {
+    return null;
+  }
+}
+
 async function descargarPDF(cot: Cotizacion) {
   try {
     const { default: jsPDF } = await import("jspdf");
@@ -81,17 +100,30 @@ async function descargarPDF(cot: Cotizacion) {
     const W = doc.internal.pageSize.getWidth();
     let y = 18;
 
+    // Logo empresa (si está disponible)
+    const logo = await getLogoDataUrl();
+    const logoSize = 22;
+    const textX = logo ? 14 + logoSize + 5 : 14;
+    if (logo) {
+      try {
+        doc.addImage(logo, "PNG", 14, y - 4, logoSize, logoSize);
+      } catch {
+        // ignore image errors, fall back to text-only header
+      }
+    }
+
     // Encabezado empresa
     doc.setFontSize(15);
     doc.setFont("helvetica", "bold");
-    doc.text(EMPRESA.nombre, 14, y);
+    doc.text(EMPRESA.nombre, textX, y);
     y += 7;
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`RUT: ${EMPRESA.rut}`, 14, y);
+    doc.text(`RUT: ${EMPRESA.rut}`, textX, y);
     y += 4;
-    doc.text(EMPRESA.giro, 14, y);
+    doc.text(EMPRESA.giro, textX, y);
     y += 9;
+    if (logo && y < 18 + logoSize - 4) y = 18 + logoSize - 4;
 
     // Título cotización
     doc.setFontSize(13);
