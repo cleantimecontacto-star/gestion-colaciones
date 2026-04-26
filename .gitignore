@@ -9,3 +9,7 @@ dev-dist
 .env.*.local
 *.log
 .vercel
+
+# Convex
+convex/_generated
+convex/tsconfig.tsbuildinfo
