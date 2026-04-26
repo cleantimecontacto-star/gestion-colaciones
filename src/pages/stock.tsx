@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EditableNumber } from "@/components/EditableNumber";
 import { formatCLP } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Plus, AlertTriangle, Package } from "lucide-react";
+import { Plus, AlertTriangle, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export default function Stock() {
   const { stock, categorias, updateStock, registrarCompra, proveedores, ivaPorcentaje, clientes } = useStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [minimizedAlerts, setMinimizedAlerts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  function toggleMinimize(cat: string) {
+    setMinimizedAlerts((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) { next.delete(cat); } else { next.add(cat); }
+      return next;
+    });
+  }
 
   const [compraData, setCompraData] = useState({
     proveedorId: "",
@@ -160,30 +169,75 @@ export default function Stock() {
               ? "border-amber-300 bg-amber-50/40"
               : "";
 
+            const hasAlert = isVacio || isCritico || isBajo;
+            const isMinimized = minimizedAlerts.has(cat);
+
             return (
               <Card key={cat} className={`shadow-sm ${styleClass}`}>
-                <CardContent className="p-4 flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-lg flex items-center gap-2">
-                      <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="truncate">{cat}</span>
-                      {(isVacio || isCritico) && (
-                        <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-lg flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="truncate">{cat}</span>
+                        {(isVacio || isCritico) && (
+                          <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                        )}
+                        {isBajo && !isVacio && !isCritico && (
+                          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                        )}
+                      </div>
+                      {!isMinimized && (
+                        <div className="text-xs text-muted-foreground">
+                          {demanda > 0
+                            ? `Próx. entrega requiere ${Math.ceil(demanda)} un.`
+                            : "Sin demanda configurada"}
+                        </div>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {demanda > 0
-                        ? `Próx. entrega requiere ${Math.ceil(demanda)} un.`
-                        : "Sin demanda configurada"}
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!isMinimized && (
+                        <div className="text-3xl font-bold">
+                          <EditableNumber
+                            value={qty}
+                            onChange={(v) => updateStock(cat, v)}
+                            className={isVacio || isCritico ? "text-destructive" : ""}
+                          />
+                        </div>
+                      )}
+                      {isMinimized && (
+                        <span className={`text-xl font-bold ${isVacio || isCritico ? "text-destructive" : isBajo ? "text-amber-600" : ""}`}>
+                          {qty}
+                        </span>
+                      )}
+                      {hasAlert && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground"
+                          onClick={() => toggleMinimize(cat)}
+                          title={isMinimized ? "Expandir" : "Minimizar"}
+                        >
+                          {isMinimized ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="text-3xl font-bold shrink-0">
-                    <EditableNumber
-                      value={qty}
-                      onChange={(v) => updateStock(cat, v)}
-                      className={isVacio || isCritico ? "text-destructive" : ""}
-                    />
-                  </div>
+
+                  {!isMinimized && hasAlert && (
+                    <div className={`mt-2 text-xs font-medium rounded px-2 py-1 ${
+                      isVacio ? "bg-destructive/10 text-destructive" :
+                      isCritico ? "bg-destructive/10 text-destructive" :
+                      "bg-amber-100 text-amber-800"
+                    }`}>
+                      {isVacio
+                        ? "⚠ Sin stock — próxima entrega sin cubrir"
+                        : isCritico
+                        ? `⚠ Stock crítico — faltan ${Math.ceil(demanda - qty)} unidades para la próxima entrega`
+                        : `⚡ Stock bajo — recomendable reabastecer`}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
