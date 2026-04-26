@@ -10,6 +10,7 @@ export interface ProductoProveedor {
   precioIncluyeIva: boolean;
   unidades: number;
   categoria: Categoria;
+  agotado?: boolean;
 }
 
 export interface Proveedor {
