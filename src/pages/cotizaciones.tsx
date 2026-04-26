@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStore, type Cotizacion, type ItemCotizacion, type EstadoCotizacion } from "@/store";
+import { Label } from "@/components/ui/label";
 import { formatCLP } from "@/lib/format";
 import { format, addDays } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,10 +70,13 @@ const emptyForm = (ivaPorcentaje: number, cotizaciones: Cotizacion[]): Omit<Coti
   numero: generarNumero(cotizaciones),
   fecha: new Date().toISOString().split("T")[0],
   vigencia: addDays(new Date(), 30).toISOString().split("T")[0],
+  clienteId: undefined,
   clienteNombre: "",
   clienteRut: "",
   clienteEmail: "",
   clienteDireccion: "",
+  ot: "",
+  facturaCliente: "",
   items: [{ id: Date.now().toString(), descripcion: "", cantidad: 1, precioUnitario: 0 }],
   estado: "borrador",
   notas: "",
@@ -140,13 +144,24 @@ async function construirPDF(cot: Cotizacion) {
     doc.text(`COTIZACIÓN Nº ${cot.numero}`, 14, y);
     y += 6;
 
-    // Fechas
+    // Fechas + OT
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text(`Fecha: ${format(new Date(cot.fecha), "dd/MM/yyyy")}`, 14, y);
     doc.text(`Válida hasta: ${format(new Date(cot.vigencia), "dd/MM/yyyy")}`, 90, y);
     doc.text(`Estado: ${ESTADO_CONFIG[cot.estado].label}`, W - 55, y);
-    y += 9;
+    y += 5;
+    if (cot.ot) {
+      doc.setFont("helvetica", "bold");
+      doc.text(`OT: ${cot.ot}`, 14, y);
+      doc.setFont("helvetica", "normal");
+      y += 4;
+    }
+    if (cot.facturaCliente) {
+      doc.text(`Factura cliente: ${cot.facturaCliente}`, 14, y);
+      y += 4;
+    }
+    y += 4;
 
     // Línea
     doc.setDrawColor(180);
@@ -305,7 +320,7 @@ async function compartirWhatsApp(cot: Cotizacion, onInfo?: (msg: string) => void
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function Cotizaciones() {
-  const { cotizaciones, addCotizacion, updateCotizacion, removeCotizacion, ivaPorcentaje } = useStore();
+  const { cotizaciones, addCotizacion, updateCotizacion, removeCotizacion, ivaPorcentaje, clientes } = useStore();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -337,6 +352,8 @@ export default function Cotizaciones() {
         RUT: c.clienteRut,
         Email: c.clienteEmail,
         Dirección: c.clienteDireccion,
+        OT: c.ot || "",
+        "Factura Cliente": c.facturaCliente || "",
         "IVA %": c.ivaPorcentaje,
         Neto: round(neto),
         IVA: round(iva),
@@ -409,7 +426,7 @@ export default function Cotizaciones() {
 
   function setItem(idx: number, field: keyof ItemCotizacion, value: string | number) {
     const items = [...form.items];
-    (items[idx] as Record<string, unknown>)[field] = value;
+    (items[idx] as unknown as Record<string, unknown>)[field] = value;
     setForm({ ...form, items });
   }
 
@@ -503,9 +520,11 @@ export default function Cotizaciones() {
                         </Badge>
                       </div>
                       <div className="text-sm font-medium mt-0.5 truncate">{cot.clienteNombre || <span className="text-muted-foreground italic">Sin cliente</span>}</div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                         <span>{format(new Date(cot.fecha), "dd/MM/yyyy")}</span>
                         {cot.clienteRut && <span>{cot.clienteRut}</span>}
+                        {cot.ot && <span className="font-mono bg-muted rounded px-1">OT: {cot.ot}</span>}
+                        {cot.facturaCliente && <span className="font-mono bg-muted rounded px-1">Fctr: {cot.facturaCliente}</span>}
                         <span className="font-semibold text-foreground">{formatCLP(total)}</span>
                       </div>
                     </div>
@@ -614,11 +633,43 @@ export default function Cotizaciones() {
               <div>
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Cliente</div>
                 <div className="grid grid-cols-2 gap-2">
+                  {clientes.length > 0 && (
+                    <div className="col-span-2">
+                      <label className="text-xs text-muted-foreground">Seleccionar cliente registrado</label>
+                      <select
+                        value={form.clienteId ?? ""}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          if (!id) {
+                            setForm({ ...form, clienteId: undefined });
+                            return;
+                          }
+                          const c = clientes.find((cl) => cl.id === id);
+                          if (c) {
+                            setForm({
+                              ...form,
+                              clienteId: c.id,
+                              clienteNombre: c.nombre,
+                              clienteRut: c.rut || "",
+                              clienteEmail: c.email || "",
+                              clienteDireccion: c.direccion || "",
+                            });
+                          }
+                        }}
+                        className="mt-0.5 w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="">— Ingreso manual —</option>
+                        {clientes.map((c) => (
+                          <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` (${c.rut})` : ""}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="col-span-2">
                     <label className="text-xs text-muted-foreground">Nombre / Razón Social *</label>
                     <Input
                       value={form.clienteNombre}
-                      onChange={(e) => setForm({ ...form, clienteNombre: e.target.value })}
+                      onChange={(e) => setForm({ ...form, clienteNombre: e.target.value, clienteId: undefined })}
                       placeholder="Empresa o persona"
                       className="h-8 text-sm mt-0.5"
                     />
@@ -650,6 +701,28 @@ export default function Cotizaciones() {
                       className="h-8 text-sm mt-0.5"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* OT y Factura */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">OT (Orden de Trabajo)</Label>
+                  <Input
+                    value={form.ot ?? ""}
+                    onChange={(e) => setForm({ ...form, ot: e.target.value })}
+                    placeholder="Ej: OT-2024-001"
+                    className="h-8 text-sm mt-0.5"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Factura Cliente</Label>
+                  <Input
+                    value={form.facturaCliente ?? ""}
+                    onChange={(e) => setForm({ ...form, facturaCliente: e.target.value })}
+                    placeholder="Nº factura emitida por cliente"
+                    className="h-8 text-sm mt-0.5"
+                  />
                 </div>
               </div>
 
