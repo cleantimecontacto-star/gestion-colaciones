@@ -111,32 +111,30 @@ async function construirPDF(cot: Cotizacion) {
     const W = doc.internal.pageSize.getWidth();
     let y = 18;
 
-    // Logo empresa (si está disponible)
+    // Logo empresa con nombre incluido (lockup)
     const logo = await getLogoDataUrl();
-    const logoSize = 22;
-    const textX = logo ? 14 + logoSize + 5 : 14;
+    const logoW = 60;
+    const logoH = logoW * (700 / 1800); // aspect ratio del lockup ≈ 23.3mm
+    let logoBottom = y - 4;
     if (logo) {
       try {
-        doc.addImage(logo, "PNG", 14, y - 4, logoSize, logoSize);
+        doc.addImage(logo, "PNG", 14, y - 4, logoW, logoH);
+        logoBottom = y - 4 + logoH;
       } catch {
         // ignore image errors, fall back to text-only header
       }
     }
 
-    // Encabezado empresa
-    doc.setFontSize(15);
-    doc.setFont("helvetica", "bold");
-    doc.text(EMPRESA.nombre, textX, y);
-    y += 7;
+    // Datos empresa a la derecha del logo (sin repetir el nombre, ya está en el logo)
+    const textX = logo ? 14 + logoW + 6 : 14;
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`RUT: ${EMPRESA.rut}`, textX, y);
-    y += 4;
-    doc.text(EMPRESA.giro, textX, y);
-    y += 4;
-    doc.text(`Tel: ${EMPRESA.telefono}`, textX, y);
-    y += 9;
-    if (logo && y < 18 + logoSize - 4) y = 18 + logoSize - 4;
+    let infoY = y;
+    doc.text(`RUT: ${EMPRESA.rut}`, textX, infoY); infoY += 4;
+    doc.text(EMPRESA.giro, textX, infoY); infoY += 4;
+    doc.text(`Tel: ${EMPRESA.telefono}`, textX, infoY); infoY += 4;
+
+    y = Math.max(logoBottom, infoY) + 4;
 
     // Título cotización
     doc.setFontSize(13);
