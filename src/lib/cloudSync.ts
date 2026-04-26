@@ -10,6 +10,7 @@
 
 import { ConvexHttpClient } from "convex/browser";
 import { useStore, type AppState } from "../store";
+import { useSyncStatus } from "./syncStatus";
 
 const CLOUD_TS_KEY = "gc_cloud_ts";
 const PERSIST_KEY = "gestion-colaciones-storage";
@@ -65,11 +66,13 @@ function setLocalTs(ts: number) {
  * Si VITE_CONVEX_URL no está configurada, no hace nada.
  */
 export function setupCloudSync(): { enabled: boolean } {
+  const status = useSyncStatus.getState();
+
   if (!CONVEX_URL) {
     if (typeof window !== "undefined") {
-      // log explícito para depuración en producción
       console.info("[cloudSync] VITE_CONVEX_URL no definida — sincronización deshabilitada");
     }
+    status.setStatus("disabled");
     return { enabled: false };
   }
 
@@ -78,6 +81,11 @@ export function setupCloudSync(): { enabled: boolean } {
   let suppressUpload = false;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let lastUploaded = "";
+
+  const setSyncing = () => useSyncStatus.getState().setStatus("syncing");
+  const setIdle = () => useSyncStatus.getState().markSynced();
+  const setError = (e: unknown) =>
+    useSyncStatus.getState().setStatus("error", e instanceof Error ? e.message : String(e));
 
   // Reemplaza el store con datos de la nube SIN disparar upload
   const applyCloudData = (data: SyncableState) => {
@@ -93,13 +101,13 @@ export function setupCloudSync(): { enabled: boolean } {
         }, {}),
       }));
     } finally {
-      // micro-tarea para que el listener no vea este cambio como "del usuario"
       setTimeout(() => { suppressUpload = false; }, 0);
     }
   };
 
   // Bajada inicial
   const initialPull = async () => {
+    setSyncing();
     try {
       const resp = (await client.query("state:getState" as any, {})) as {
         data: SyncableState | null;
@@ -111,16 +119,16 @@ export function setupCloudSync(): { enabled: boolean } {
         applyCloudData(resp.data);
         setLocalTs(cloudTs);
         lastUploaded = JSON.stringify(resp.data);
+        setIdle();
         console.info("[cloudSync] Datos descargados de la nube");
       } else if (myTs > 0) {
-        // Lo nuestro es más nuevo: subir
         await pushNow();
       } else {
-        // Primera vez en este dispositivo y nube vacía: subir lo nuestro como semilla
         await pushNow();
       }
     } catch (e) {
       console.warn("[cloudSync] Error al descargar:", e);
+      setError(e);
     }
   };
 
@@ -128,7 +136,11 @@ export function setupCloudSync(): { enabled: boolean } {
     try {
       const data = pickSyncable(useStore.getState());
       const serialized = JSON.stringify(data);
-      if (serialized === lastUploaded) return;
+      if (serialized === lastUploaded) {
+        setIdle();
+        return;
+      }
+      setSyncing();
       const ts = Date.now();
       const result = (await client.mutation("state:setState" as any, {
         data,
@@ -137,8 +149,8 @@ export function setupCloudSync(): { enabled: boolean } {
       if (result?.ok) {
         setLocalTs(result.ts);
         lastUploaded = serialized;
+        setIdle();
       } else if (result?.ts) {
-        // Otro dispositivo escribió más tarde: descargar y reaplicar
         const fresh = (await client.query("state:getState" as any, {})) as {
           data: SyncableState | null;
           ts: number;
@@ -148,9 +160,13 @@ export function setupCloudSync(): { enabled: boolean } {
           setLocalTs(fresh.ts);
           lastUploaded = JSON.stringify(fresh.data);
         }
+        setIdle();
+      } else {
+        setIdle();
       }
     } catch (e) {
       console.warn("[cloudSync] Error al subir:", e);
+      setError(e);
     }
   };
 
@@ -196,7 +212,6 @@ export function setupCloudSync(): { enabled: boolean } {
     window.addEventListener("online", () => {
       void initialPull();
     });
-    // Cambios desde otra pestaña actualizan timestamp local
     window.addEventListener("storage", (e) => {
       if (e.key === PERSIST_KEY) {
         scheduleUpload();

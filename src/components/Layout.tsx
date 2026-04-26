@@ -7,6 +7,7 @@ import {
   CheckCircle2, X, Smartphone, Monitor, UserSquare2,
 } from "lucide-react";
 import logoSerendipia from "@/assets/logo-serendipia.png";
+import { SyncIndicator } from "@/components/SyncIndicator";
 import { useStore } from "@/store";
 
 interface LayoutProps {
@@ -148,10 +149,13 @@ export function Layout({ children }: LayoutProps) {
               <div>RUT 77.875.974-8</div>
             </div>
           </div>
-          <div
-            className={`h-2 w-2 rounded-full shrink-0 ${isOnline ? "bg-green-500" : "bg-red-500"}`}
-            title={isOnline ? "Online" : "Offline"}
-          />
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <div
+              className={`h-2 w-2 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}
+              title={isOnline ? "Online" : "Offline"}
+            />
+            <SyncIndicator />
+          </div>
         </div>
 
         <nav className="flex-1 p-2 space-y-1">
@@ -202,6 +206,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-2">
             {/* Botón instalar — siempre visible en móvil */}
             <InstallButton mobile />
+            <SyncIndicator />
             {isOnline ? (
               <Wifi className="h-4 w-4 text-green-500" />
             ) : (
