@@ -490,6 +490,20 @@ export default function Config() {
                             />
                             El precio guardado ya incluye IVA
                           </label>
+                          <label className="flex items-center gap-2 text-xs cursor-pointer">
+                            <Checkbox
+                              checked={!!prod.agotado}
+                              onCheckedChange={(v) =>
+                                updateProductoProveedor(prov.id, prod.id, {
+                                  agotado: v === true,
+                                })
+                              }
+                              data-testid={`checkbox-agotado-${prod.id}`}
+                            />
+                            <span className={prod.agotado ? "text-amber-700 dark:text-amber-400 font-medium" : "text-muted-foreground"}>
+                              {prod.agotado ? "Agotado (oculto en Compras)" : "Marcar como agotado"}
+                            </span>
+                          </label>
                         </div>
                       );
                     })}
