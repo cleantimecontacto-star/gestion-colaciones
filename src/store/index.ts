@@ -27,6 +27,11 @@ export type ModoCobro = "unitario" | "paquete";
 export interface Cliente {
   id: string;
   nombre: string;
+  rut?: string;
+  email?: string;
+  telefono?: string;
+  direccion?: string;
+  laboral?: string;
   config: Record<string, number>;
   /** Días cubiertos por semana (lun-jue = 4) */
   diasEntrega: number;
@@ -71,10 +76,13 @@ export interface Cotizacion {
   numero: string;
   fecha: string;
   vigencia: string;
+  clienteId?: string;
   clienteNombre: string;
   clienteRut: string;
   clienteEmail: string;
   clienteDireccion: string;
+  ot?: string;
+  facturaCliente?: string;
   items: ItemCotizacion[];
   estado: EstadoCotizacion;
   notas: string;
@@ -603,7 +611,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 5,
+      version: 6,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -665,12 +673,13 @@ export const useStore = create<AppState>()(
           state.categorias = state.categorias ?? [...DEFAULT_CATEGORIAS];
         }
         if (version < 5 && Array.isArray(state.clientes)) {
-          // Agrega entregasPorSemana (default 2: típico Lun y Mié)
           state.clientes = state.clientes.map((c: any) => ({
             ...c,
             entregasPorSemana: c.entregasPorSemana ?? 2,
           }));
         }
+        // v6: optional fields rut/email/telefono/direccion/laboral on Cliente,
+        //     optional ot/facturaCliente/clienteId on Cotizacion — no migration needed
         return state as AppState;
       },
     }
