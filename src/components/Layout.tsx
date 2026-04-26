@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, ShoppingCart, Users, Package,
   History, Settings, Wifi, WifiOff, FileText, Download,
@@ -109,6 +109,24 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex flex-col md:flex-row h-[100dvh] w-full max-w-full overflow-x-hidden overflow-y-hidden bg-background text-foreground">
+      {/* Banner sin conexión */}
+      <AnimatePresence>
+        {!isOnline && (
+          <motion.div
+            initial={{ y: -40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -40, opacity: 0 }}
+            transition={{ type: "tween", duration: 0.2 }}
+            className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-[11px] sm:text-xs font-medium py-1.5 px-3 flex items-center justify-center gap-2 shadow-md pt-[calc(env(safe-area-inset-top)+0.375rem)]"
+            role="status"
+            aria-live="polite"
+          >
+            <WifiOff className="h-3.5 w-3.5 shrink-0" />
+            <span>Sin conexión — los cambios se guardan en este dispositivo</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card">
         <div className="p-4 flex items-center justify-between border-b border-border">
