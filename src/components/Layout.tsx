@@ -12,13 +12,13 @@ interface LayoutProps {
 }
 
 const TABS = [
-  { href: "/", icon: LayoutDashboard, label: "Panel" },
-  { href: "/compras", icon: ShoppingCart, label: "Compras" },
-  { href: "/ventas", icon: Users, label: "Ventas" },
-  { href: "/cotizaciones", icon: FileText, label: "Cotizaciones" },
-  { href: "/stock", icon: Package, label: "Stock" },
-  { href: "/historial", icon: History, label: "Historial" },
-  { href: "/config", icon: Settings, label: "Config" },
+  { href: "/", icon: LayoutDashboard, label: "Panel", short: "Panel" },
+  { href: "/compras", icon: ShoppingCart, label: "Compras", short: "Compras" },
+  { href: "/ventas", icon: Users, label: "Ventas", short: "Ventas" },
+  { href: "/cotizaciones", icon: FileText, label: "Cotizaciones", short: "Cotiz." },
+  { href: "/stock", icon: Package, label: "Stock", short: "Stock" },
+  { href: "/historial", icon: History, label: "Historial", short: "Histor." },
+  { href: "/config", icon: Settings, label: "Config", short: "Config" },
 ];
 
 export function Layout({ children }: LayoutProps) {
@@ -191,14 +191,14 @@ export function Layout({ children }: LayoutProps) {
       </main>
 
       {/* Mobile Bottom Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border flex items-center px-0.5 pb-safe z-50 overflow-hidden">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border flex items-stretch w-full pb-safe z-50">
         {TABS.map((tab) => {
           const isActive = location === tab.href;
           return (
-            <Link key={tab.href} href={tab.href}>
-              <span className="relative flex flex-col items-center justify-center h-full cursor-pointer px-0.5 flex-1 min-w-0 basis-0">
+            <Link key={tab.href} href={tab.href} className="flex-1 min-w-0 basis-0">
+              <span className="relative flex flex-col items-center justify-center h-full w-full cursor-pointer py-1.5 px-0.5">
                 <div
-                  className={`flex flex-col items-center justify-center w-9 h-9 rounded-xl transition-colors relative z-10 ${
+                  className={`flex items-center justify-center w-9 h-9 rounded-xl transition-colors relative z-10 ${
                     isActive ? "text-primary-foreground" : "text-muted-foreground"
                   }`}
                 >
@@ -212,11 +212,11 @@ export function Layout({ children }: LayoutProps) {
                   <tab.icon className="h-[18px] w-[18px]" />
                 </div>
                 <span
-                  className={`text-[9px] leading-tight mt-0.5 max-w-full truncate text-center ${
+                  className={`text-[10px] leading-none mt-1 text-center w-full ${
                     isActive ? "text-primary font-semibold" : "text-muted-foreground"
                   }`}
                 >
-                  {tab.label}
+                  {tab.short}
                 </span>
               </span>
             </Link>
