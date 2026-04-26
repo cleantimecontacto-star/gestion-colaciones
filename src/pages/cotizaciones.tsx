@@ -23,6 +23,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const WhatsAppIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 32 32" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.45-1.504-.901-2.156-1.504-.151-.15-.301-.301-.45-.451-.521-.521-.971-1.04-1.391-1.695-.15-.211-.301-.421-.301-.661 0-.301.211-.451.421-.601.21-.15.451-.301.601-.451.15-.15.21-.301.301-.451.06-.151.06-.301.06-.451 0-.15-.06-.301-.121-.451-.06-.15-.601-1.45-.871-2.155-.18-.451-.421-.601-.601-.601-.18 0-.421-.06-.661-.06-.21 0-.541.06-.871.421-.301.301-1.181 1.18-1.181 2.853 0 1.66.871 3.286 1.181 3.557.301.301 3.586 5.738 8.766 7.494 1.21.451 2.156.661 2.881.871.961.301 1.831.241 2.521.121.781-.121 2.402-.961 2.732-1.901.301-.961.301-1.781.211-1.96-.061-.121-.301-.181-.601-.301-.301-.12-1.781-.871-2.062-.961-.301-.121-.481-.181-.661.181-.18.301-.781.961-.961 1.18-.18.211-.301.241-.601.121zM26.811 5.244C24.142 2.566 20.589 1.076 16.836 1.076c-7.726 0-14.012 6.286-14.012 14.012 0 2.521.66 4.943 1.93 7.104L1.5 30.555l8.555-2.521c2.062 1.121 4.434 1.781 6.781 1.781 7.726 0 14.012-6.287 14.012-14.012 0-3.752-1.49-7.305-4.038-10.014zM16.836 26.799c-2.121 0-4.183-.541-6.013-1.601l-.421-.241-4.434 1.181 1.181-4.314-.301-.45c-1.181-1.902-1.781-4.073-1.781-6.336 0-6.488 5.342-11.83 11.83-11.83 3.135 0 6.094 1.211 8.314 3.434 2.221 2.222 3.434 5.18 3.434 8.314-.061 6.547-5.402 11.844-11.809 11.844z"/>
+  </svg>
+);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const EMPRESA = {
@@ -92,12 +98,11 @@ async function getLogoDataUrl(): Promise<string | null> {
   }
 }
 
-async function descargarPDF(cot: Cotizacion) {
-  try {
-    const { default: jsPDF } = await import("jspdf");
-    const { default: autoTable } = await import("jspdf-autotable");
+async function construirPDF(cot: Cotizacion) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
 
-    const doc = new jsPDF({ unit: "mm", format: "letter" });
+  const doc = new jsPDF({ unit: "mm", format: "letter" });
     const W = doc.internal.pageSize.getWidth();
     let y = 18;
 
@@ -234,10 +239,65 @@ async function descargarPDF(cot: Cotizacion) {
     );
     doc.text(`${EMPRESA.nombre} | RUT ${EMPRESA.rut} | Tel ${EMPRESA.telefono}`, 14, pageHeight - 8);
 
+  return doc;
+}
+
+async function descargarPDF(cot: Cotizacion) {
+  try {
+    const doc = await construirPDF(cot);
     doc.save(`${cot.numero}.pdf`);
   } catch (err) {
     console.error("Error al generar PDF:", err);
     alert("No se pudo generar el PDF. Intenta de nuevo.");
+  }
+}
+
+function buildWhatsAppMensaje(cot: Cotizacion): string {
+  const { total } = calcularTotales(cot.items, cot.ivaPorcentaje);
+  const cliente = cot.clienteNombre || "estimado(a) cliente";
+  return (
+    `Hola ${cliente}, te comparto la cotización ${cot.numero} de ${EMPRESA.nombre}.\n` +
+    `Fecha: ${format(new Date(cot.fecha), "dd/MM/yyyy")}\n` +
+    `Válida hasta: ${format(new Date(cot.vigencia), "dd/MM/yyyy")}\n` +
+    `Total (IVA incl.): ${formatCLP(total)}\n\n` +
+    `Adjunto el PDF con el detalle. Cualquier consulta, quedo atento.\n` +
+    `${EMPRESA.nombre} · Tel ${EMPRESA.telefono}`
+  );
+}
+
+async function compartirWhatsApp(cot: Cotizacion, onInfo?: (msg: string) => void) {
+  try {
+    const doc = await construirPDF(cot);
+    const blob = doc.output("blob");
+    const filename = `${cot.numero}.pdf`;
+    const file = new File([blob], filename, { type: "application/pdf" });
+    const texto = buildWhatsAppMensaje(cot);
+
+    const nav = navigator as Navigator & {
+      canShare?: (data?: ShareData) => boolean;
+      share?: (data: ShareData) => Promise<void>;
+    };
+
+    if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
+      try {
+        await nav.share({
+          files: [file],
+          title: `Cotización ${cot.numero}`,
+          text: texto,
+        });
+        return;
+      } catch (err) {
+        if ((err as DOMException)?.name === "AbortError") return;
+      }
+    }
+
+    doc.save(filename);
+    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    onInfo?.("PDF descargado. Adjúntalo en el chat de WhatsApp que se abrió.");
+  } catch (err) {
+    console.error("Error al compartir por WhatsApp:", err);
+    alert("No se pudo compartir la cotización. Intenta de nuevo.");
   }
 }
 
@@ -388,6 +448,19 @@ export default function Cotizaciones() {
                         title="Descargar PDF"
                       >
                         <Download className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-[#25D366]"
+                        onClick={() =>
+                          compartirWhatsApp(cot, (msg) =>
+                            toast({ title: "Compartir cotización", description: msg })
+                          )
+                        }
+                        title="Compartir por WhatsApp"
+                      >
+                        <WhatsAppIcon className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
