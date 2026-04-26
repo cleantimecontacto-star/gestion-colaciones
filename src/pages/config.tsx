@@ -6,7 +6,7 @@ import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Truck, Tag } from "lucide-react";
+import { Trash2, Plus, Truck, Tag, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { formatCLP } from "@/lib/format";
@@ -114,6 +114,18 @@ export default function Config() {
       description: prov
         ? `Se creó "Nuevo Producto" en ${prov.nombre}. Editá nombre y precio.`
         : 'Se creó "Nuevo Producto". Editá nombre y precio.',
+    });
+  };
+
+  const handleDuplicarProducto = (proveedorId: string, prod: ProductoProveedor) => {
+    addProductoProveedor(proveedorId, {
+      ...prod,
+      id: `prod${Date.now()}`,
+      nombre: `${prod.nombre} (copia)`,
+    });
+    toast({
+      title: "Producto duplicado",
+      description: `Se creó "${prod.nombre} (copia)" con el mismo precio y unidades.`,
     });
   };
 
@@ -386,6 +398,16 @@ export default function Config() {
                               ))}
                               <option value="__nueva__">+ Nueva…</option>
                             </select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleDuplicarProducto(prov.id, prod)}
+                              data-testid={`button-duplicar-producto-${prod.id}`}
+                              title="Duplicar producto"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
