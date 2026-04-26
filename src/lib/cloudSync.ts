@@ -2,10 +2,10 @@
  * Sincronización con Convex (last-write-wins).
  *
  * Estrategia:
- *  - La app sigue usando zustand+persist (localStorage) como hasta ahora.
- *  - Al arrancar: si hay nube y la nube es más nueva, baja datos y refresca el store.
- *  - En cada cambio del store: sube datos a la nube (debounced 600ms).
- *  - Si VITE_CONVEX_URL no está definida, no hace nada (modo offline puro).
+ * - La app sigue usando zustand+persist (localStorage) como hasta ahora.
+ * - Al arrancar: si hay nube y la nube es más nueva, baja datos y refresca el store.
+ * - En cada cambio del store: sube datos a la nube (debounced 600ms).
+ * - Si VITE_CONVEX_URL no está definida, no hace nada (modo offline puro).
  */
 
 import { ConvexHttpClient } from "convex/browser";
@@ -80,12 +80,15 @@ export function setupCloudSync(): { enabled: boolean } {
 
   // suppressUpload bloquea uploads durante la bajada inicial e
   // inmediatamente después de aplicar datos de la nube al store local.
-  // Esto evita que datos viejos del localStorage sobrescriban datos
-  // más nuevos de la nube por una condición de carrera al arrancar.
   let suppressUpload = true;
   let initialPullDone = false;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let lastUploaded = "";
+
+  // FIX: Registra si el usuario realizó cambios mientras el pull inicial
+  // estaba en curso (suppressUpload=true o initialPullDone=false).
+  // Si es true, ignoramos la respuesta de la nube y subimos los datos locales.
+  let userChangedDuringSuppression = false;
 
   const setSyncing = () => useSyncStatus.getState().setStatus("syncing");
   const setIdle = () => useSyncStatus.getState().markSynced();
@@ -98,7 +101,7 @@ export function setupCloudSync(): { enabled: boolean } {
     try {
       useStore.setState((current) => ({
         ...current,
-        ...SYNC_KEYS.reduce<Partial<SyncableState>>((acc, key) => {
+        ...SYNC_KEYS.reduce<Partial<AppState>>((acc, key) => {
           if (data[key] !== undefined) {
             (acc as any)[key] = data[key];
           }
@@ -113,6 +116,11 @@ export function setupCloudSync(): { enabled: boolean } {
   // Bajada inicial
   const initialPull = async () => {
     setSyncing();
+
+    // FIX: Capturar estado local ANTES de la petición de red,
+    // para poder restaurarlo si el usuario hizo cambios durante el pull.
+    const stateBeforePull = pickSyncable(useStore.getState());
+
     try {
       const resp = (await client.query("state:getState" as any, {})) as {
         data: SyncableState | null;
@@ -120,6 +128,17 @@ export function setupCloudSync(): { enabled: boolean } {
       };
       const cloudTs = Number(resp?.ts || 0);
       const myTs = localTs();
+
+      // FIX: Si el usuario hizo cambios mientras esperábamos la respuesta
+      // de la nube, ignoramos los datos descargados y subimos los cambios locales.
+      if (userChangedDuringSuppression) {
+        console.info("[cloudSync] Cambios locales detectados durante el pull — subiendo datos locales");
+        suppressUpload = false;
+        initialPullDone = true;
+        await pushNow();
+        return;
+      }
+
       if (cloudTs > myTs && resp.data) {
         applyCloudData(resp.data);
         setLocalTs(cloudTs);
@@ -128,7 +147,6 @@ export function setupCloudSync(): { enabled: boolean } {
         console.info("[cloudSync] Datos descargados de la nube");
       } else if (myTs > 0 || cloudTs === 0) {
         // Subir lo nuestro como fuente o como semilla
-        // (sólo después de habilitar uploads)
         suppressUpload = false;
         initialPullDone = true;
         await pushNow();
@@ -137,9 +155,15 @@ export function setupCloudSync(): { enabled: boolean } {
     } catch (e) {
       console.warn("[cloudSync] Error al descargar:", e);
       setError(e);
+
+      // FIX: Si falló la red pero el usuario ya hizo cambios, subir de todas formas
+      if (userChangedDuringSuppression) {
+        suppressUpload = false;
+        initialPullDone = true;
+        await pushNow();
+        return;
+      }
     } finally {
-      // Habilitar uploads de cambios del usuario sólo DESPUÉS
-      // de que la bajada inicial haya terminado.
       suppressUpload = false;
       initialPullDone = true;
     }
@@ -184,7 +208,12 @@ export function setupCloudSync(): { enabled: boolean } {
   };
 
   const scheduleUpload = () => {
-    if (suppressUpload || !initialPullDone) return;
+    // FIX: Si el usuario cambia algo mientras suppressUpload está activo,
+    // registrarlo para que initialPull lo detecte y no sobreescriba.
+    if (suppressUpload || !initialPullDone) {
+      userChangedDuringSuppression = true;
+      return;
+    }
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       void pushNow();
@@ -220,9 +249,12 @@ export function setupCloudSync(): { enabled: boolean } {
   // Resincroniza al volver a la pestaña / online
   if (typeof window !== "undefined") {
     window.addEventListener("focus", () => {
+      // FIX: Resetear el flag al volver a la pestaña (pull nuevo = ventana nueva)
+      userChangedDuringSuppression = false;
       void initialPull();
     });
     window.addEventListener("online", () => {
+      userChangedDuringSuppression = false;
       void initialPull();
     });
     window.addEventListener("storage", (e) => {
