@@ -336,7 +336,7 @@ export const useStore = create<AppState>()(
           );
           // Si cambió la categoría a una nueva, registrarla
           if (data.categoria) {
-            return syncCategoriasFromProductos({ ...state, proveedores } as AppState);
+            return { proveedores, ...syncCategoriasFromProductos({ ...state, proveedores } as AppState) };
           }
           return { proveedores };
         }),
@@ -346,7 +346,7 @@ export const useStore = create<AppState>()(
           const proveedores = state.proveedores.map((p) =>
             p.id === proveedorId ? { ...p, productos: [...p.productos, producto] } : p
           );
-          return syncCategoriasFromProductos({ ...state, proveedores } as AppState);
+          return { proveedores, ...syncCategoriasFromProductos({ ...state, proveedores } as AppState) };
         }),
 
       removeProductoProveedor: (proveedorId, productoId) =>
