@@ -7,6 +7,7 @@ import {
   CheckCircle2, X, Smartphone, Monitor, UserSquare2,
 } from "lucide-react";
 import logoSerendipia from "@/assets/logo-serendipia.png";
+import { useStore } from "@/store";
 
 interface LayoutProps {
   children: ReactNode;
@@ -25,6 +26,10 @@ const TABS = [
 
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
+  const empresaLogo = useStore((s) => s.empresa.logoDataUrl);
+  const empresaNombre = useStore((s) => s.empresa.nombre);
+  const logoSrc = empresaLogo || logoSerendipia;
+  const logoAlt = empresaNombre || "Serendipia";
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const deferredPrompt = useRef<any>(null);
   const [canInstall, setCanInstall] = useState(false);
@@ -134,8 +139,8 @@ export function Layout({ children }: LayoutProps) {
         <div className="p-4 flex items-center justify-between border-b border-border">
           <div className="flex flex-col min-w-0">
             <img
-              src={logoSerendipia}
-              alt="Serendipia"
+              src={logoSrc}
+              alt={logoAlt}
               className="h-10 w-auto object-contain self-start"
             />
             <div className="text-[10px] text-muted-foreground leading-tight mt-1">
@@ -186,8 +191,8 @@ export function Layout({ children }: LayoutProps) {
         <header className="md:hidden flex items-center justify-between p-3 border-b border-border bg-card shrink-0">
           <div className="flex flex-col min-w-0">
             <img
-              src={logoSerendipia}
-              alt="Serendipia"
+              src={logoSrc}
+              alt={logoAlt}
               className="h-8 w-auto object-contain self-start"
             />
             <div className="text-[9px] text-muted-foreground leading-tight mt-0.5">
