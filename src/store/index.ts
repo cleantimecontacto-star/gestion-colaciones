@@ -141,7 +141,7 @@ export interface AppState {
   // Transacciones
   registrarCompra: (montoNeto: number, iva: number, montoTotal: number, detalles: string, itemsStock: Record<string, number>) => void;
   registrarVenta: (clienteId: string) => void;
-  registrarVentaPersonalizada: (clienteId: string, unidades: Record<string, number>, montoNetoOverride?: number) => void;
+  registrarVentaPersonalizada: (clienteId: string, unidades: Record<string, number>, montoNetoOverride?: number, nota?: string) => void;
   updateTransaccion: (id: string, data: Partial<Pick<Transaccion, "montoTotal" | "detalles" | "fecha">>) => void;
   removeTransaccion: (id: string) => void;
 
@@ -521,7 +521,7 @@ export const useStore = create<AppState>()(
           };
         }),
 
-      registrarVentaPersonalizada: (clienteId, unidades, montoNetoOverride) =>
+      registrarVentaPersonalizada: (clienteId, unidades, montoNetoOverride, nota) =>
         set((state) => {
           const cliente = state.clientes.find((c) => c.id === clienteId);
           if (!cliente) return state;
@@ -591,10 +591,12 @@ export const useStore = create<AppState>()(
                 montoNeto: neto,
                 iva: ivaMonto,
                 montoTotal: totalBruto,
-                detalles:
-                  partes.length > 0
+                detalles: (() => {
+                  const base = partes.length > 0
                     ? `Entrega a ${cliente.nombre} (${partes.join(", ")})`
-                    : `Entrega a ${cliente.nombre} (sin unidades)`,
+                    : `Entrega a ${cliente.nombre} (sin unidades)`;
+                  return nota ? `${base} — ${nota}` : base;
+                })(),
                 clienteId: cliente.id,
                 stockDelta,
               },

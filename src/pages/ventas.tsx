@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface NuevoClienteForm {
   nombre: string;
@@ -78,6 +79,7 @@ export default function Ventas() {
   const [customCliente, setCustomCliente] = useState<Cliente | null>(null);
   const [customUnidades, setCustomUnidades] = useState<Record<string, number>>({});
   const [customMontoNeto, setCustomMontoNeto] = useState<number>(0);
+  const [customNota, setCustomNota] = useState<string>("");
 
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [nuevo, setNuevo] = useState<NuevoClienteForm>(() => buildDefaultNuevo(categorias));
@@ -166,6 +168,7 @@ export default function Ventas() {
     });
     setCustomCliente(cliente);
     setCustomUnidades(inicial);
+    setCustomNota("");
     // Precargar monto neto con el valor estándar de la entrega
     if (cliente.modoCobro === "paquete") {
       const netoDia = cliente.paquete.ivaIncluido
@@ -200,7 +203,7 @@ export default function Ventas() {
       return;
     }
     const montoOverride = customCliente.modoCobro === "paquete" ? customMontoNeto : undefined;
-    registrarVentaPersonalizada(customCliente.id, customUnidades, montoOverride);
+    registrarVentaPersonalizada(customCliente.id, customUnidades, montoOverride, customNota.trim() || undefined);
     const detalle = Object.entries(customUnidades)
       .filter(([, v]) => v > 0)
       .map(([cat, v]) => `${v} ${cat}`)
@@ -566,6 +569,21 @@ export default function Ventas() {
               </p>
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="custom-nota" className="text-xs font-medium">
+              Nota (opcional)
+            </Label>
+            <Textarea
+              id="custom-nota"
+              placeholder="Ej: Solo frutas este día, cliente fuera de oficina, etc."
+              value={customNota}
+              onChange={(e) => setCustomNota(e.target.value)}
+              className="text-sm resize-none"
+              rows={2}
+              data-testid="input-custom-nota"
+            />
+          </div>
 
           <div className="flex justify-between items-center bg-primary/5 rounded p-2 border border-primary/10">
             <div className="text-xs font-medium text-muted-foreground">
