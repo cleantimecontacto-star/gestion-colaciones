@@ -13,6 +13,7 @@ export default function Compras() {
   const { proveedores, ivaPorcentaje, categorias, clientes, stock, registrarCompra } = useStore();
   const { toast } = useToast();
   const [semanasCubrir, setSemanasCubrir] = useState(2);
+  const [seleccionPorCat, setSeleccionPorCat] = useState<Record<string, string>>({});
 
   // Productos enriquecidos con costos
   const productosPorCat = (cat: string) =>
@@ -55,15 +56,20 @@ export default function Compras() {
       const faltante = Math.max(0, requerido - stockActual);
       const productos = productosPorCat(cat);
       const mejor = productos[0];
+      const elegidoId = seleccionPorCat[cat];
+      const elegido =
+        (elegidoId && productos.find((p) => p.id === elegidoId)) || mejor;
 
-      if (demanda <= 0 || faltante <= 0 || !mejor || !isFinite(mejor.costoUnitario)) {
+      if (demanda <= 0 || faltante <= 0 || !elegido || !isFinite(elegido.costoUnitario)) {
         return {
           cat,
           demanda,
           requerido,
           stockActual,
           faltante,
+          productos,
           mejor: mejor || null,
+          elegido: elegido || null,
           cajas: 0,
           unidadesCubiertas: 0,
           costoTotal: 0,
@@ -71,10 +77,10 @@ export default function Compras() {
         };
       }
 
-      const cajas = Math.ceil(faltante / mejor.unidades);
-      const unidadesCubiertas = cajas * mejor.unidades;
-      const costoTotal = cajas * mejor.precioTotal;
-      const costoNeto = cajas * mejor.precioNeto;
+      const cajas = Math.ceil(faltante / elegido.unidades);
+      const unidadesCubiertas = cajas * elegido.unidades;
+      const costoTotal = cajas * elegido.precioTotal;
+      const costoNeto = cajas * elegido.precioNeto;
 
       return {
         cat,
@@ -82,7 +88,9 @@ export default function Compras() {
         requerido,
         stockActual,
         faltante,
+        productos,
         mejor,
+        elegido,
         cajas,
         unidadesCubiertas,
         costoTotal,
@@ -96,7 +104,7 @@ export default function Compras() {
 
   const registrarTodasSugerencias = () => {
     sugerencias.forEach((s) => {
-      if (!s.mejor || s.cajas <= 0) return;
+      if (!s.elegido || s.cajas <= 0) return;
       const neto = s.costoNeto;
       const iva = s.costoTotal - s.costoNeto;
       const total = s.costoTotal;
@@ -104,30 +112,30 @@ export default function Compras() {
         neto,
         iva,
         total,
-        `Compra sugerida: ${s.cajas}x ${s.mejor.nombre} (${s.mejor.proveedorNombre})`,
+        `Compra: ${s.cajas}x ${s.elegido.nombre} (${s.elegido.proveedorNombre})`,
         { [s.cat]: s.unidadesCubiertas }
       );
     });
     toast({
       title: "Compras registradas",
-      description: `Se registraron ${sugerencias.filter((s) => s.cajas > 0).length} compras sugeridas.`,
+      description: `Se registraron ${sugerencias.filter((s) => s.cajas > 0).length} compras.`,
     });
   };
 
   const registrarUnaSugerencia = (s: typeof sugerencias[number]) => {
-    if (!s.mejor || s.cajas <= 0) return;
+    if (!s.elegido || s.cajas <= 0) return;
     const neto = s.costoNeto;
     const iva = s.costoTotal - s.costoNeto;
     registrarCompra(
       neto,
       iva,
       s.costoTotal,
-      `Compra sugerida: ${s.cajas}x ${s.mejor.nombre} (${s.mejor.proveedorNombre})`,
+      `Compra: ${s.cajas}x ${s.elegido.nombre} (${s.elegido.proveedorNombre})`,
       { [s.cat]: s.unidadesCubiertas }
     );
     toast({
       title: "Compra registrada",
-      description: `${s.cajas} cajas de ${s.mejor.nombre} agregadas al stock.`,
+      description: `${s.cajas} cajas de ${s.elegido.nombre} agregadas al stock.`,
     });
   };
 
@@ -195,34 +203,60 @@ export default function Compras() {
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Tienes suficiente para {semanasCubrir} {semanasCubrir === 1 ? "semana" : "semanas"}
                         </div>
-                      ) : !s.mejor ? (
+                      ) : !s.elegido ? (
                         <div className="text-destructive">
                           Faltan {Math.ceil(s.faltante)} un. — sin proveedores con esta categoría.
                         </div>
                       ) : (
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium break-words">
-                              {s.cajas}× {s.mejor.nombre}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground break-words">
-                              {s.mejor.proveedorNombre} • {s.unidadesCubiertas} un. (cubre faltante de {Math.ceil(s.faltante)})
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between sm:justify-end gap-2 min-w-0">
-                            <div className="text-right min-w-0">
-                              <div className="font-bold text-primary whitespace-nowrap">{formatCLP(s.costoTotal)}</div>
-                              <div className="text-[10px] text-muted-foreground whitespace-nowrap">Neto: {formatCLP(s.costoNeto)}</div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[11px] shrink-0"
-                              onClick={() => registrarUnaSugerencia(s)}
-                              data-testid={`button-comprar-${s.cat}`}
+                        <div className="flex flex-col gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-muted-foreground shrink-0">Proveedor:</span>
+                            <select
+                              value={s.elegido.id}
+                              onChange={(e) =>
+                                setSeleccionPorCat((prev) => ({ ...prev, [s.cat]: e.target.value }))
+                              }
+                              className="text-xs h-7 rounded border border-input bg-background px-1.5 max-w-full flex-1 min-w-0"
+                              data-testid={`select-proveedor-${s.cat}`}
                             >
-                              Comprar
-                            </Button>
+                              {s.productos.map((p, i) => (
+                                <option key={p.id} value={p.id}>
+                                  {i === 0 ? "★ " : ""}
+                                  {p.proveedorNombre} — {p.nombre} · {formatCLP(p.costoUnitario)}/un
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium break-words">
+                                {s.cajas}× {s.elegido.nombre}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground break-words">
+                                {s.elegido.proveedorNombre} • {s.unidadesCubiertas} un. (cubre faltante de {Math.ceil(s.faltante)})
+                                {s.mejor && s.elegido.id !== s.mejor.id && (
+                                  <span className="text-amber-700 dark:text-amber-400">
+                                    {" "}
+                                    · +{formatCLP(s.costoTotal - s.cajas * s.mejor.precioTotal)} vs mejor
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between sm:justify-end gap-2 min-w-0">
+                              <div className="text-right min-w-0">
+                                <div className="font-bold text-primary whitespace-nowrap">{formatCLP(s.costoTotal)}</div>
+                                <div className="text-[10px] text-muted-foreground whitespace-nowrap">Neto: {formatCLP(s.costoNeto)}</div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-[11px] shrink-0"
+                                onClick={() => registrarUnaSugerencia(s)}
+                                data-testid={`button-comprar-${s.cat}`}
+                              >
+                                Comprar
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}
