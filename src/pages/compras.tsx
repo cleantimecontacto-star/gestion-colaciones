@@ -15,12 +15,12 @@ export default function Compras() {
   const [semanasCubrir, setSemanasCubrir] = useState(2);
   const [seleccionPorCat, setSeleccionPorCat] = useState<Record<string, string>>({});
 
-  // Productos enriquecidos con costos
+  // Productos enriquecidos con costos (excluye agotados)
   const productosPorCat = (cat: string) =>
     proveedores
       .flatMap((p) =>
         p.productos
-          .filter((prod) => prod.categoria === cat)
+          .filter((prod) => prod.categoria === cat && !prod.agotado)
           .map((prod) => {
             const precioNeto = prod.precioIncluyeIva
               ? prod.precio / (1 + ivaPorcentaje / 100)
