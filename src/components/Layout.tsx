@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, ShoppingCart, Users, Package,
   History, Settings, Wifi, WifiOff, FileText, Download,
-  CheckCircle2, X, Smartphone, Monitor,
+  CheckCircle2, X, Smartphone, Monitor, UserSquare2,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -13,9 +13,10 @@ interface LayoutProps {
 
 const TABS = [
   { href: "/", icon: LayoutDashboard, label: "Panel", short: "Panel" },
-  { href: "/compras", icon: ShoppingCart, label: "Compras", short: "Compras" },
-  { href: "/ventas", icon: Users, label: "Ventas", short: "Ventas" },
+  { href: "/clientes", icon: UserSquare2, label: "Clientes", short: "Client." },
   { href: "/cotizaciones", icon: FileText, label: "Cotizaciones", short: "Cotiz." },
+  { href: "/ventas", icon: Users, label: "Ventas", short: "Ventas" },
+  { href: "/compras", icon: ShoppingCart, label: "Compras", short: "Compras" },
   { href: "/stock", icon: Package, label: "Stock", short: "Stock" },
   { href: "/historial", icon: History, label: "Historial", short: "Histor." },
   { href: "/config", icon: Settings, label: "Config", short: "Config" },
