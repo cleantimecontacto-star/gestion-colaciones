@@ -93,9 +93,14 @@ export default function Config() {
       despachoPorKiloExtra: 0,
       productos: [],
     });
+    toast({
+      title: "Proveedor agregado",
+      description: 'Se creó "Nuevo Proveedor". Tocá su nombre para editarlo.',
+    });
   };
 
   const handleAddProducto = (proveedorId: string) => {
+    const prov = proveedores.find((p) => p.id === proveedorId);
     addProductoProveedor(proveedorId, {
       id: `prod${Date.now()}`,
       nombre: "Nuevo Producto",
@@ -103,6 +108,12 @@ export default function Config() {
       precioIncluyeIva: false,
       unidades: 1,
       categoria: categorias[0] || "Sin categoría",
+    });
+    toast({
+      title: "Producto agregado",
+      description: prov
+        ? `Se creó "Nuevo Producto" en ${prov.nombre}. Editá nombre y precio.`
+        : 'Se creó "Nuevo Producto". Editá nombre y precio.',
     });
   };
 
