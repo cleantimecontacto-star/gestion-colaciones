@@ -191,14 +191,14 @@ export function Layout({ children }: LayoutProps) {
       </main>
 
       {/* Mobile Bottom Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border flex justify-around items-center px-1 pb-safe z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border flex items-center px-0.5 pb-safe z-50 overflow-hidden">
         {TABS.map((tab) => {
           const isActive = location === tab.href;
           return (
             <Link key={tab.href} href={tab.href}>
-              <span className="relative flex flex-col items-center justify-center w-full h-full cursor-pointer px-1">
+              <span className="relative flex flex-col items-center justify-center h-full cursor-pointer px-0.5 flex-1 min-w-0 basis-0">
                 <div
-                  className={`flex flex-col items-center justify-center w-10 h-10 rounded-xl transition-colors relative z-10 ${
+                  className={`flex flex-col items-center justify-center w-9 h-9 rounded-xl transition-colors relative z-10 ${
                     isActive ? "text-primary-foreground" : "text-muted-foreground"
                   }`}
                 >
@@ -209,9 +209,13 @@ export function Layout({ children }: LayoutProps) {
                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     />
                   )}
-                  <tab.icon className="h-5 w-5" />
+                  <tab.icon className="h-[18px] w-[18px]" />
                 </div>
-                <span className={`text-[10px] mt-0.5 ${isActive ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+                <span
+                  className={`text-[9px] leading-tight mt-0.5 max-w-full truncate text-center ${
+                    isActive ? "text-primary font-semibold" : "text-muted-foreground"
+                  }`}
+                >
                   {tab.label}
                 </span>
               </span>
