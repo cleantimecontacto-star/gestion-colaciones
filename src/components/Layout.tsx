@@ -6,6 +6,7 @@ import {
   History, Settings, Wifi, WifiOff, FileText, Download,
   CheckCircle2, X, Smartphone, Monitor, UserSquare2,
 } from "lucide-react";
+import logoSerendipia from "@/assets/logo-serendipia.png";
 
 interface LayoutProps {
   children: ReactNode;
@@ -131,12 +132,13 @@ export function Layout({ children }: LayoutProps) {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card">
         <div className="p-4 flex items-center justify-between border-b border-border">
-          <div className="flex flex-col">
-            <h1 className="font-bold text-xl text-primary flex items-center gap-2">
-              <Package className="h-6 w-6" />
-              Serendipia
-            </h1>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 ml-8">
+          <div className="flex flex-col min-w-0">
+            <img
+              src={logoSerendipia}
+              alt="Serendipia"
+              className="h-10 w-auto object-contain self-start"
+            />
+            <div className="text-[10px] text-muted-foreground leading-tight mt-1">
               <div>Comercializadora SerendipiaVK SpA</div>
               <div>RUT 77.875.974-8</div>
             </div>
@@ -182,12 +184,13 @@ export function Layout({ children }: LayoutProps) {
       <main className="flex-1 flex flex-col min-w-0 max-w-full h-full overflow-hidden relative">
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-3 border-b border-border bg-card shrink-0">
-          <div className="flex flex-col">
-            <h1 className="font-bold text-lg text-primary flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Serendipia
-            </h1>
-            <div className="text-[9px] text-muted-foreground ml-7 leading-tight">
+          <div className="flex flex-col min-w-0">
+            <img
+              src={logoSerendipia}
+              alt="Serendipia"
+              className="h-8 w-auto object-contain self-start"
+            />
+            <div className="text-[9px] text-muted-foreground leading-tight mt-0.5">
               RUT 77.875.974-8
             </div>
           </div>
