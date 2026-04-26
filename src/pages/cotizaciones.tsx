@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useStore, type Cotizacion, type ItemCotizacion, type EstadoCotizacion } from "@/store";
+import { useStore, type Cotizacion, type ItemCotizacion, type EstadoCotizacion, type EmpresaConfig } from "@/store";
 import { Label } from "@/components/ui/label";
 import { formatCLP } from "@/lib/format";
 import { format, addDays } from "date-fns";
@@ -32,13 +32,6 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 );
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const EMPRESA = {
-  nombre: "Comercializadora SerendipiaVK SpA",
-  rut: "77.875.974-8",
-  giro: "Comercialización de colaciones y alimentación laboral",
-  telefono: "+56 9 5239 6823",
-};
 
 const ESTADO_CONFIG: Record<EstadoCotizacion, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   borrador:   { label: "Borrador",  variant: "secondary" },
@@ -85,25 +78,40 @@ const emptyForm = (ivaPorcentaje: number, cotizaciones: Cotizacion[]): Omit<Coti
 
 // ─── PDF ──────────────────────────────────────────────────────────────────────
 
-let _logoDataUrl: string | null = null;
-async function getLogoDataUrl(): Promise<string | null> {
-  if (_logoDataUrl) return _logoDataUrl;
+let _defaultLogoDataUrl: string | null = null;
+async function getDefaultLogoDataUrl(): Promise<string | null> {
+  if (_defaultLogoDataUrl) return _defaultLogoDataUrl;
   try {
     const res = await fetch(logoSerendipia);
     const blob = await res.blob();
-    _logoDataUrl = await new Promise<string>((resolve, reject) => {
+    _defaultLogoDataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
-    return _logoDataUrl;
+    return _defaultLogoDataUrl;
   } catch {
     return null;
   }
 }
 
-async function construirPDF(cot: Cotizacion) {
+async function getLogoDataUrl(empresa: EmpresaConfig): Promise<string | null> {
+  if (empresa.logoDataUrl) return empresa.logoDataUrl;
+  return getDefaultLogoDataUrl();
+}
+
+/** Lee el aspect ratio de un data URL/PNG (devuelve width/height). */
+function getImageAspect(dataUrl: string): Promise<number> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth / Math.max(1, img.naturalHeight));
+    img.onerror = () => resolve(1800 / 700); // fallback al lockup por defecto
+    img.src = dataUrl;
+  });
+}
+
+async function construirPDF(cot: Cotizacion, empresa: EmpresaConfig) {
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
 
@@ -111,28 +119,44 @@ async function construirPDF(cot: Cotizacion) {
     const W = doc.internal.pageSize.getWidth();
     let y = 18;
 
-    // Logo empresa con nombre incluido (lockup)
-    const logo = await getLogoDataUrl();
-    const logoW = 60;
-    const logoH = logoW * (700 / 1800); // aspect ratio del lockup ≈ 23.3mm
+    // Logo empresa (preferentemente con nombre incluido)
+    const logo = await getLogoDataUrl(empresa);
+    const isCustomLogo = !!empresa.logoDataUrl;
     let logoBottom = y - 4;
+    let logoRight = 14;
     if (logo) {
       try {
+        const aspect = await getImageAspect(logo);
+        // Si es cuadrado-ish lo tratamos como icono (más chico).
+        // Si es panorámico lo tratamos como lockup (más ancho).
+        const isWide = aspect > 1.4;
+        const logoH = isWide ? 22 : 26;
+        const logoW = logoH * aspect;
         doc.addImage(logo, "PNG", 14, y - 4, logoW, logoH);
         logoBottom = y - 4 + logoH;
+        logoRight = 14 + logoW;
       } catch {
         // ignore image errors, fall back to text-only header
       }
     }
 
-    // Datos empresa a la derecha del logo (sin repetir el nombre, ya está en el logo)
-    const textX = logo ? 14 + logoW + 6 : 14;
+    // Si el logo es custom y posiblemente NO incluye el nombre, lo escribimos al lado.
+    // Para el logo por defecto (lockup), evitamos duplicar.
+    const textX = logo ? logoRight + 6 : 14;
+    let infoY = y;
+    if (isCustomLogo) {
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.text(empresa.nombre, textX, infoY);
+      infoY += 6;
+    }
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    let infoY = y;
-    doc.text(`RUT: ${EMPRESA.rut}`, textX, infoY); infoY += 4;
-    doc.text(EMPRESA.giro, textX, infoY); infoY += 4;
-    doc.text(`Tel: ${EMPRESA.telefono}`, textX, infoY); infoY += 4;
+    if (empresa.rut)       { doc.text(`RUT: ${empresa.rut}`, textX, infoY); infoY += 4; }
+    if (empresa.giro)      { doc.text(empresa.giro, textX, infoY); infoY += 4; }
+    if (empresa.telefono)  { doc.text(`Tel: ${empresa.telefono}`, textX, infoY); infoY += 4; }
+    if (empresa.email)     { doc.text(empresa.email, textX, infoY); infoY += 4; }
+    if (empresa.direccion) { doc.text(empresa.direccion, textX, infoY); infoY += 4; }
 
     y = Math.max(logoBottom, infoY) + 4;
 
@@ -251,14 +275,14 @@ async function construirPDF(cot: Cotizacion) {
       14,
       pageHeight - 12
     );
-    doc.text(`${EMPRESA.nombre} | RUT ${EMPRESA.rut} | Tel ${EMPRESA.telefono}`, 14, pageHeight - 8);
+    doc.text(`${empresa.nombre} | RUT ${empresa.rut} | Tel ${empresa.telefono}`, 14, pageHeight - 8);
 
   return doc;
 }
 
-async function descargarPDF(cot: Cotizacion) {
+async function descargarPDF(cot: Cotizacion, empresa: EmpresaConfig) {
   try {
-    const doc = await construirPDF(cot);
+    const doc = await construirPDF(cot, empresa);
     doc.save(`${cot.numero}.pdf`);
   } catch (err) {
     console.error("Error al generar PDF:", err);
@@ -266,26 +290,26 @@ async function descargarPDF(cot: Cotizacion) {
   }
 }
 
-function buildWhatsAppMensaje(cot: Cotizacion): string {
+function buildWhatsAppMensaje(cot: Cotizacion, empresa: EmpresaConfig): string {
   const { total } = calcularTotales(cot.items, cot.ivaPorcentaje);
   const cliente = cot.clienteNombre || "estimado(a) cliente";
   return (
-    `Hola ${cliente}, te comparto la cotización ${cot.numero} de ${EMPRESA.nombre}.\n` +
+    `Hola ${cliente}, te comparto la cotización ${cot.numero} de ${empresa.nombre}.\n` +
     `Fecha: ${format(new Date(cot.fecha), "dd/MM/yyyy")}\n` +
     `Válida hasta: ${format(new Date(cot.vigencia), "dd/MM/yyyy")}\n` +
     `Total (IVA incl.): ${formatCLP(total)}\n\n` +
     `Adjunto el PDF con el detalle. Cualquier consulta, quedo atento.\n` +
-    `${EMPRESA.nombre} · Tel ${EMPRESA.telefono}`
+    `${empresa.nombre} · Tel ${empresa.telefono}`
   );
 }
 
-async function compartirWhatsApp(cot: Cotizacion, onInfo?: (msg: string) => void) {
+async function compartirWhatsApp(cot: Cotizacion, empresa: EmpresaConfig, onInfo?: (msg: string) => void) {
   try {
-    const doc = await construirPDF(cot);
+    const doc = await construirPDF(cot, empresa);
     const blob = doc.output("blob");
     const filename = `${cot.numero}.pdf`;
     const file = new File([blob], filename, { type: "application/pdf" });
-    const texto = buildWhatsAppMensaje(cot);
+    const texto = buildWhatsAppMensaje(cot, empresa);
 
     const nav = navigator as Navigator & {
       canShare?: (data?: ShareData) => boolean;
@@ -318,7 +342,7 @@ async function compartirWhatsApp(cot: Cotizacion, onInfo?: (msg: string) => void
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function Cotizaciones() {
-  const { cotizaciones, addCotizacion, updateCotizacion, removeCotizacion, ivaPorcentaje, clientes } = useStore();
+  const { cotizaciones, addCotizacion, updateCotizacion, removeCotizacion, ivaPorcentaje, clientes, empresa } = useStore();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -540,7 +564,7 @@ export default function Cotizaciones() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-primary"
-                        onClick={() => descargarPDF(cot)}
+                        onClick={() => descargarPDF(cot, empresa)}
                         title="Descargar PDF"
                       >
                         <Download className="h-3.5 w-3.5" />
@@ -550,7 +574,7 @@ export default function Cotizaciones() {
                         size="icon"
                         className="h-8 w-8 text-[#25D366]"
                         onClick={() =>
-                          compartirWhatsApp(cot, (msg) =>
+                          compartirWhatsApp(cot, empresa, (msg) =>
                             toast({ title: "Compartir cotización", description: msg })
                           )
                         }

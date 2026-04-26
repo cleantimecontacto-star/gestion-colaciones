@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore, diasPorEntregaCliente } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { formatCLP } from "@/lib/format";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, DollarSign, ShoppingCart, Percent, AlertTriangle, Package, XCircle } from "lucide-react";
+import { TrendingUp, DollarSign, ShoppingCart, Percent, AlertTriangle, Package, XCircle, ChevronUp, ChevronDown } from "lucide-react";
+
 import { subWeeks, subMonths, subYears, isAfter, format, startOfWeek, startOfMonth, startOfYear } from "date-fns";
 import { es } from "date-fns/locale";
+
+const ALERTAS_MIN_KEY = "dashboard.alertasStockMinimizado";
 
 type Periodo = "semana" | "mes" | "año";
 
@@ -18,6 +22,14 @@ const PERIODO_LABEL: Record<Periodo, string> = {
 export default function Dashboard() {
   const { historial, stock, clientes, categorias } = useStore();
   const [periodo, setPeriodo] = useState<Periodo>("semana");
+  const [alertasMin, setAlertasMin] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(ALERTAS_MIN_KEY) === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(ALERTAS_MIN_KEY, alertasMin ? "1" : "0");
+  }, [alertasMin]);
 
   const now = new Date();
 
@@ -190,7 +202,19 @@ export default function Dashboard() {
             <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-900">
               {alertasActivas.length}
             </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 -mr-1 text-amber-900 hover:bg-amber-200/60 dark:text-amber-200"
+              onClick={() => setAlertasMin((v) => !v)}
+              title={alertasMin ? "Mostrar alertas" : "Minimizar alertas"}
+              aria-label={alertasMin ? "Mostrar alertas" : "Minimizar alertas"}
+              data-testid="button-toggle-alertas"
+            >
+              {alertasMin ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </Button>
           </CardHeader>
+          {!alertasMin && (
           <CardContent className="p-3 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
             {alertasActivas.map((n) => {
               const styles =
@@ -238,6 +262,7 @@ export default function Dashboard() {
               );
             })}
           </CardContent>
+          )}
         </Card>
       )}
 

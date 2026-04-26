@@ -89,6 +89,17 @@ export interface Cotizacion {
   ivaPorcentaje: number;
 }
 
+export interface EmpresaConfig {
+  nombre: string;
+  rut: string;
+  giro: string;
+  telefono: string;
+  email?: string;
+  direccion?: string;
+  /** Data URL (PNG/JPEG) del logo personalizado para el PDF. Si null, usa el logo por defecto. */
+  logoDataUrl: string | null;
+}
+
 export interface AppState {
   ivaPorcentaje: number;
   categorias: string[];
@@ -97,8 +108,11 @@ export interface AppState {
   stock: Stock;
   historial: Transaccion[];
   cotizaciones: Cotizacion[];
+  empresa: EmpresaConfig;
 
   setIva: (iva: number) => void;
+  setEmpresa: (data: Partial<EmpresaConfig>) => void;
+  resetEmpresaLogo: () => void;
 
   // Categorías
   addCategoria: (nombre: string) => void;
@@ -187,6 +201,16 @@ const DEFAULT_CLIENTES: Cliente[] = [
   },
 ];
 
+export const DEFAULT_EMPRESA: EmpresaConfig = {
+  nombre: "Comercializadora SerendipiaVK SpA",
+  rut: "77.875.974-8",
+  giro: "Comercialización de colaciones y alimentación laboral",
+  telefono: "+56 9 5239 6823",
+  email: "",
+  direccion: "",
+  logoDataUrl: null,
+};
+
 const generateInitialState = () => ({
   ivaPorcentaje: 19,
   categorias: [...DEFAULT_CATEGORIAS],
@@ -195,6 +219,7 @@ const generateInitialState = () => ({
   stock: { Fruta: 0, Snack: 0, Barra: 0 } as Stock,
   historial: [] as Transaccion[],
   cotizaciones: [] as Cotizacion[],
+  empresa: { ...DEFAULT_EMPRESA },
 });
 
 // Helpers para mantener stock/clientes sincronizados con la lista de categorías
@@ -253,6 +278,12 @@ export const useStore = create<AppState>()(
       ...generateInitialState(),
 
       setIva: (iva) => set({ ivaPorcentaje: iva }),
+
+      setEmpresa: (data) =>
+        set((state) => ({ empresa: { ...state.empresa, ...data } })),
+
+      resetEmpresaLogo: () =>
+        set((state) => ({ empresa: { ...state.empresa, logoDataUrl: null } })),
 
       addCategoria: (nombre) => {
         const limpio = nombre.trim();
@@ -611,7 +642,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 6,
+      version: 7,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -680,6 +711,9 @@ export const useStore = create<AppState>()(
         }
         // v6: optional fields rut/email/telefono/direccion/laboral on Cliente,
         //     optional ot/facturaCliente/clienteId on Cotizacion — no migration needed
+        if (version < 7) {
+          state.empresa = state.empresa ?? { ...DEFAULT_EMPRESA };
+        }
         return state as AppState;
       },
     }

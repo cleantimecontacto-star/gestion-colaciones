@@ -6,7 +6,7 @@ import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Truck, Tag, Copy } from "lucide-react";
+import { Trash2, Plus, Truck, Tag, Copy, Building2, Image as ImageIcon, Upload, RotateCcw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { formatCLP } from "@/lib/format";
@@ -38,9 +38,50 @@ export default function Config() {
     updateProductoProveedor,
     removeProductoProveedor,
     resetToDefaults,
+    empresa,
+    setEmpresa,
+    resetEmpresaLogo,
   } = useStore();
   const { toast } = useToast();
   const [nuevaCategoria, setNuevaCategoria] = useState("");
+
+  const handleLogoUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Archivo inválido",
+        description: "Selecciona una imagen (PNG, JPG o WebP).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file.size > 1.5 * 1024 * 1024) {
+      toast({
+        title: "Imagen muy pesada",
+        description: "El logo debe pesar menos de 1.5 MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+      setEmpresa({ logoDataUrl: dataUrl });
+      toast({
+        title: "Logo actualizado",
+        description: "Se aplicará en los próximos PDFs que generes.",
+      });
+    } catch {
+      toast({
+        title: "Error al cargar el logo",
+        description: "No se pudo procesar la imagen.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleAddCategoria = () => {
     const limpio = nuevaCategoria.trim();
@@ -167,6 +208,134 @@ export default function Config() {
                 <span className="font-bold bg-muted px-2 py-1 rounded">
                   <EditableNumber value={ivaPorcentaje} onChange={setIva} />
                 </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm" data-testid="card-empresa">
+            <CardHeader className="p-3 border-b border-border/50">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-4 w-4" /> Datos de empresa
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Estos datos aparecen automáticamente en cada PDF de cotización y en los mensajes de WhatsApp.
+              </p>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Razón social</label>
+                  <Input
+                    value={empresa.nombre}
+                    onChange={(e) => setEmpresa({ nombre: e.target.value })}
+                    placeholder="Comercializadora SerendipiaVK SpA"
+                    data-testid="input-empresa-nombre"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">RUT</label>
+                  <Input
+                    value={empresa.rut}
+                    onChange={(e) => setEmpresa({ rut: e.target.value })}
+                    placeholder="77.875.974-8"
+                    data-testid="input-empresa-rut"
+                  />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">Giro</label>
+                  <Input
+                    value={empresa.giro}
+                    onChange={(e) => setEmpresa({ giro: e.target.value })}
+                    placeholder="Comercialización de colaciones y alimentación laboral"
+                    data-testid="input-empresa-giro"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Teléfono</label>
+                  <Input
+                    value={empresa.telefono}
+                    onChange={(e) => setEmpresa({ telefono: e.target.value })}
+                    placeholder="+56 9 5239 6823"
+                    data-testid="input-empresa-telefono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <Input
+                    type="email"
+                    value={empresa.email ?? ""}
+                    onChange={(e) => setEmpresa({ email: e.target.value })}
+                    placeholder="contacto@serendipia.cl"
+                    data-testid="input-empresa-email"
+                  />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">Dirección</label>
+                  <Input
+                    value={empresa.direccion ?? ""}
+                    onChange={(e) => setEmpresa({ direccion: e.target.value })}
+                    placeholder="Calle, número, comuna, ciudad"
+                    data-testid="input-empresa-direccion"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-border/50 pt-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Logo para el PDF</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Si no subes nada, se usa el logo por defecto de Serendipia. Para mejor calidad, sube un PNG con fondo transparente o blanco. Tamaño máximo: 1.5 MB.
+                </p>
+                <div className="flex items-start gap-4 flex-wrap">
+                  <div className="w-32 h-32 rounded-md border border-border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                    {empresa.logoDataUrl ? (
+                      <img
+                        src={empresa.logoDataUrl}
+                        alt="Logo personalizado"
+                        className="max-w-full max-h-full object-contain"
+                        data-testid="img-empresa-logo"
+                      />
+                    ) : (
+                      <div className="text-center text-[10px] text-muted-foreground px-2">
+                        Sin logo personalizado
+                        <div className="mt-1 text-muted-foreground/70">(se usa el de Serendipia)</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleLogoUpload(f);
+                          e.target.value = "";
+                        }}
+                        data-testid="input-empresa-logo-file"
+                      />
+                      <Button asChild variant="default" size="sm" className="cursor-pointer">
+                        <span><Upload className="h-3.5 w-3.5 mr-1.5" /> {empresa.logoDataUrl ? "Cambiar logo" : "Subir logo"}</span>
+                      </Button>
+                    </label>
+                    {empresa.logoDataUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          resetEmpresaLogo();
+                          toast({ title: "Logo restaurado", description: "Se volvió al logo por defecto." });
+                        }}
+                        data-testid="button-empresa-logo-reset"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Restaurar por defecto
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
