@@ -189,8 +189,8 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 max-w-full h-full overflow-hidden relative">
+      {/* Main Content — flex-1 min-h-0 en lugar de h-full para evitar scroll doble */}
+      <main className="flex-1 min-h-0 flex flex-col min-w-0 max-w-full overflow-hidden relative">
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-3 border-b border-border bg-card shrink-0">
           <div className="flex flex-col min-w-0">
@@ -215,7 +215,7 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        {/* Área de contenido — un único flex item con scroll propio */}
+        {/* Área de contenido — único flex item con scroll propio */}
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-background min-w-0 max-w-full p-2 md:p-4 pb-24 md:pb-4">
           {children}
         </div>
