@@ -116,7 +116,7 @@ export function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[100dvh] w-full max-w-full overflow-x-hidden overflow-y-hidden bg-background text-foreground">
+    <div className="flex flex-col md:flex-row h-[100dvh] w-full max-w-full overflow-hidden bg-background text-foreground">
       {/* Banner sin conexión */}
       <AnimatePresence>
         {!isOnline && (
@@ -215,10 +215,9 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-hidden bg-background min-w-0 max-w-full">
-          <div className="h-full w-full max-w-full overflow-y-auto overflow-x-hidden p-2 md:p-4 pb-24 md:pb-4">
-            {children}
-          </div>
+        {/* Área de contenido — un único flex item con scroll propio */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-background min-w-0 max-w-full p-2 md:p-4 pb-24 md:pb-4">
+          {children}
         </div>
       </main>
 
