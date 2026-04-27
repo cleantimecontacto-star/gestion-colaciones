@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Download, Edit2, FileText, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, Download, Edit2, FileText, FileSpreadsheet, Eye } from "lucide-react";
 import * as XLSX from "xlsx";
 import logoSerendipia from "@/assets/logo-serendipia.png";
 import {
@@ -350,6 +350,7 @@ export default function Cotizaciones() {
   const [form, setForm] = useState<Omit<Cotizacion, "id">>(() => emptyForm(ivaPorcentaje, cotizaciones));
 
   const filtradas = filtro === "todas" ? cotizaciones : cotizaciones.filter((c) => c.estado === filtro);
+  const [verCot, setVerCot] = useState<Cotizacion | null>(null);
 
   function abrirNueva() {
     setEditingId(null);
@@ -551,6 +552,13 @@ export default function Cotizaciones() {
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => setVerCot(cot)}
+                        className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                        title="Ver cotización"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -617,6 +625,97 @@ export default function Cotizaciones() {
           })}
         </div>
       </ScrollArea>
+
+      {/* Dialog preview */}
+      <Dialog open={verCot !== null} onOpenChange={(o) => { if (!o) setVerCot(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>{verCot?.numero}</span>
+              {verCot && (
+                <Badge
+                  variant={ESTADO_CONFIG[verCot.estado].variant}
+                  className={`text-[10px] px-1.5 py-0 h-4 ${
+                    verCot.estado === "aceptada" ? "bg-green-600 text-white" :
+                    verCot.estado === "enviada" ? "bg-blue-600 text-white" : ""
+                  }`}
+                >
+                  {ESTADO_CONFIG[verCot.estado].label}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {verCot && (() => {
+            const { neto, iva, total } = calcularTotales(verCot.items, verCot.ivaPorcentaje);
+            return (
+              <div className="space-y-3 text-sm">
+                {/* Fechas */}
+                <div className="flex gap-4 text-muted-foreground">
+                  <span>📅 {format(new Date(verCot.fecha), 'dd/MM/yyyy')}</span>
+                  <span>⏳ Válida hasta {format(new Date(verCot.vigencia), 'dd/MM/yyyy')}</span>
+                </div>
+                {/* Cliente */}
+                <div className="rounded-lg bg-muted/40 p-3 space-y-1">
+                  <p className="font-medium text-foreground">{verCot.clienteNombre || 'Sin cliente'}</p>
+                  {verCot.clienteRut && <p className="text-muted-foreground">RUT: {verCot.clienteRut}</p>}
+                  {verCot.clienteEmail && <p className="text-muted-foreground">{verCot.clienteEmail}</p>}
+                  {verCot.clienteDireccion && <p className="text-muted-foreground">{verCot.clienteDireccion}</p>}
+                  {verCot.ot && <p className="text-muted-foreground">OT: {verCot.ot}</p>}
+                  {verCot.facturaCliente && <p className="text-muted-foreground">Factura: {verCot.facturaCliente}</p>}
+                </div>
+                {/* Ítems */}
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-muted/60 text-muted-foreground">
+                        <th className="text-left p-2 font-medium">Descripción</th>
+                        <th className="text-center p-2 font-medium w-12">Cant.</th>
+                        <th className="text-right p-2 font-medium w-24">P. Unit.</th>
+                        <th className="text-right p-2 font-medium w-24">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {verCot.items.filter(i => i.descripcion.trim()).map((item, idx) => (
+                        <tr key={idx} className="border-t border-border">
+                          <td className="p-2 text-foreground">{item.descripcion}</td>
+                          <td className="p-2 text-center text-muted-foreground">{item.cantidad}</td>
+                          <td className="p-2 text-right text-muted-foreground">{formatCLP(item.precioUnitario)}</td>
+                          <td className="p-2 text-right text-foreground">{formatCLP(item.cantidad * item.precioUnitario)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Totales */}
+                <div className="space-y-1 border-t border-border pt-3">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Subtotal Neto</span><span>{formatCLP(neto)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>IVA ({verCot.ivaPorcentaje}%)</span><span>{formatCLP(iva)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-foreground">
+                    <span>TOTAL</span><span>{formatCLP(total)}</span>
+                  </div>
+                </div>
+                {/* Notas */}
+                {verCot.notas && (
+                  <p className="text-xs text-muted-foreground border-t border-border pt-2">{verCot.notas}</p>
+                )}
+                {/* Acciones */}
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button size="sm" onClick={() => descargarPDF(verCot, empresa)}>
+                    <Download className="h-3 w-3 mr-1" /> PDF
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setVerCot(null)}>
+                    Cerrar
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog crear/editar */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
