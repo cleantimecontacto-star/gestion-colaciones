@@ -490,13 +490,13 @@ export default function Cotizaciones() {
         </div>
       </div>
 
-      {/* Filtros de estado */}
-      <div className="flex gap-1.5 flex-wrap px-1">
+      {/* Filtros de estado — una sola fila, scroll horizontal en móvil */}
+      <div className="flex gap-1.5 px-1 overflow-x-auto whitespace-nowrap -mx-1 pb-1">
         {(["todas", "borrador", "enviada", "aceptada", "rechazada"] as const).map((estado) => (
           <button
             key={estado}
             onClick={() => setFiltro(estado)}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
               filtro === estado
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-background text-muted-foreground border-border hover:border-primary/50"
