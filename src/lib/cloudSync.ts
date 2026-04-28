@@ -15,9 +15,7 @@ import { useSyncStatus } from "./syncStatus";
 const CLOUD_TS_KEY = "gc_cloud_ts";
 const PERSIST_KEY = "gestion-colaciones-storage";
 
-// URL de Convex. Si VITE_CONVEX_URL no está definida (p.ej. olvido en Vercel),
-// usamos la URL pública del backend compartido como fallback. Para desactivar
-// la sincronización por completo, definir VITE_CONVEX_URL="" en Vercel.
+// URL de Convex.
 const CONVEX_URL =
   (import.meta.env.VITE_CONVEX_URL as string | undefined) ??
   "https://polite-ocelot-652.eu-west-1.convex.cloud";
@@ -83,16 +81,10 @@ export function setupCloudSync(): { enabled: boolean } {
 
   const client = new ConvexHttpClient(CONVEX_URL);
 
-  // suppressUpload bloquea uploads durante la bajada inicial e
-  // inmediatamente después de aplicar datos de la nube al store local.
   let suppressUpload = true;
   let initialPullDone = false;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let lastUploaded = "";
-
-  // FIX: Registra si el usuario realizó cambios mientras el pull inicial
-  // estaba en curso (suppressUpload=true o initialPullDone=false).
-  // Si es true, ignoramos la respuesta de la nube y subimos los datos locales.
   let userChangedDuringSuppression = false;
 
   const setSyncing = () => useSyncStatus.getState().setStatus("syncing");
@@ -100,7 +92,6 @@ export function setupCloudSync(): { enabled: boolean } {
   const setError = (e: unknown) =>
     useSyncStatus.getState().setStatus("error", e instanceof Error ? e.message : String(e));
 
-  // Reemplaza el store con datos de la nube SIN disparar upload
   const applyCloudData = (data: SyncableState) => {
     suppressUpload = true;
     try {
@@ -114,17 +105,16 @@ export function setupCloudSync(): { enabled: boolean } {
         }, {}),
       }));
     } finally {
-      setTimeout(() => { suppressUpload = false; }, 0);
+      // Usar un timeout pequeño para asegurar que el cambio de estado se procese antes de reactivar uploads
+      setTimeout(() => { suppressUpload = false; }, 50);
     }
   };
 
-  // Bajada inicial
   const initialPull = async () => {
+    // Evitar múltiples pulls simultáneos si ya estamos sincronizando
+    if (useSyncStatus.getState().status === "syncing" && initialPullDone) return;
+    
     setSyncing();
-
-    // FIX: Capturar estado local ANTES de la petición de red,
-    // para poder restaurarlo si el usuario hizo cambios durante el pull.
-    const stateBeforePull = pickSyncable(useStore.getState());
 
     try {
       const resp = (await client.query("colaciones:getState" as any, {})) as {
@@ -134,12 +124,11 @@ export function setupCloudSync(): { enabled: boolean } {
       const cloudTs = Number(resp?.ts || 0);
       const myTs = localTs();
 
-      // FIX: Si el usuario hizo cambios mientras esperábamos la respuesta
-      // de la nube, ignoramos los datos descargados y subimos los cambios locales.
       if (userChangedDuringSuppression) {
         console.info("[cloudSync] Cambios locales detectados durante el pull — subiendo datos locales");
         suppressUpload = false;
         initialPullDone = true;
+        userChangedDuringSuppression = false;
         await pushNow();
         return;
       }
@@ -150,24 +139,18 @@ export function setupCloudSync(): { enabled: boolean } {
         lastUploaded = JSON.stringify(resp.data);
         setIdle();
         console.info("[cloudSync] Datos descargados de la nube");
-      } else if (myTs > 0 || cloudTs === 0) {
-        // Subir lo nuestro como fuente o como semilla
+      } else if (myTs > cloudTs || (myTs > 0 && cloudTs === 0)) {
+        // Tenemos datos más nuevos o la nube está vacía pero nosotros no
         suppressUpload = false;
         initialPullDone = true;
         await pushNow();
         return;
+      } else {
+        setIdle();
       }
     } catch (e) {
       console.warn("[cloudSync] Error al descargar:", e);
       setError(e);
-
-      // FIX: Si falló la red pero el usuario ya hizo cambios, subir de todas formas
-      if (userChangedDuringSuppression) {
-        suppressUpload = false;
-        initialPullDone = true;
-        await pushNow();
-        return;
-      }
     } finally {
       suppressUpload = false;
       initialPullDone = true;
@@ -175,24 +158,31 @@ export function setupCloudSync(): { enabled: boolean } {
   };
 
   const pushNow = async () => {
+    if (suppressUpload) return;
+    
     try {
       const data = pickSyncable(useStore.getState());
       const serialized = JSON.stringify(data);
+      
+      // No subir si no hay cambios reales
       if (serialized === lastUploaded) {
         setIdle();
         return;
       }
+      
       setSyncing();
       const ts = Date.now();
       const result = (await client.mutation("colaciones:setState" as any, {
         data,
         ts,
       })) as { ok: boolean; ts: number };
+      
       if (result?.ok) {
         setLocalTs(result.ts);
         lastUploaded = serialized;
         setIdle();
       } else if (result?.ts) {
+        // Conflicto: la nube tiene datos más nuevos
         const fresh = (await client.query("colaciones:getState" as any, {})) as {
           data: SyncableState | null;
           ts: number;
@@ -213,8 +203,6 @@ export function setupCloudSync(): { enabled: boolean } {
   };
 
   const scheduleUpload = () => {
-    // FIX: Si el usuario cambia algo mientras suppressUpload está activo,
-    // registrarlo para que initialPull lo detecte y no sobreescriba.
     if (suppressUpload || !initialPullDone) {
       userChangedDuringSuppression = true;
       return;
@@ -222,18 +210,17 @@ export function setupCloudSync(): { enabled: boolean } {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       void pushNow();
-    }, 600);
+    }, 1000); // Aumentado a 1s para reducir carga
   };
 
-  // Suscribirse a cambios del store
   useStore.subscribe(() => {
     scheduleUpload();
   });
 
-  // Esperar hidratación de zustand+persist antes del initial pull
   const startInitial = () => {
     void initialPull();
   };
+  
   if (
     typeof useStore.persist === "object" &&
     useStore.persist &&
@@ -251,17 +238,23 @@ export function setupCloudSync(): { enabled: boolean } {
     startInitial();
   }
 
-  // Resincroniza al volver a la pestaña / online
   if (typeof window !== "undefined") {
+    // Debounce de eventos de ventana para evitar pulls masivos
+    let focusTimer: ReturnType<typeof setTimeout> | null = null;
+    
     window.addEventListener("focus", () => {
-      // FIX: Resetear el flag al volver a la pestaña (pull nuevo = ventana nueva)
-      userChangedDuringSuppression = false;
-      void initialPull();
+      if (focusTimer) clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => {
+        userChangedDuringSuppression = false;
+        void initialPull();
+      }, 500);
     });
+    
     window.addEventListener("online", () => {
       userChangedDuringSuppression = false;
       void initialPull();
     });
+    
     window.addEventListener("storage", (e) => {
       if (e.key === PERSIST_KEY) {
         scheduleUpload();
