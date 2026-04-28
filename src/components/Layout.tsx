@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, ShoppingCart, Users, Package,
   History, Settings, Wifi, WifiOff, FileText, Download,
-  CheckCircle2, X, Smartphone, Monitor, UserSquare2,
+  CheckCircle2, X, Smartphone, Monitor, UserSquare2, Trash2,
 } from "lucide-react";
 import logoSerendipia from "@/assets/logo-serendipia.png";
 import { SyncIndicator } from "@/components/SyncIndicator";
@@ -22,6 +22,7 @@ const TABS = [
   { href: "/compras", icon: ShoppingCart, label: "Compras", short: "Compras" },
   { href: "/stock", icon: Package, label: "Stock", short: "Stock" },
   { href: "/historial", icon: History, label: "Historial", short: "Histor." },
+  { href: "/papelera", icon: Trash2, label: "Papelera", short: "Papel." },
   { href: "/config", icon: Settings, label: "Config", short: "Config" },
 ];
 

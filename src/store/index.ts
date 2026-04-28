@@ -100,6 +100,23 @@ export interface EmpresaConfig {
   logoDataUrl: string | null;
 }
 
+export type PapeleraTipo =
+  | "cliente"
+  | "proveedor"
+  | "producto"
+  | "transaccion"
+  | "cotizacion";
+
+export interface PapeleraItem {
+  pid: string;
+  tipo: PapeleraTipo;
+  fecha: string;
+  resumen: string;
+  data: any;
+  /** Para productos: id del proveedor al que pertenecía */
+  parentId?: string;
+}
+
 export interface AppState {
   ivaPorcentaje: number;
   categorias: string[];
@@ -109,6 +126,7 @@ export interface AppState {
   historial: Transaccion[];
   cotizaciones: Cotizacion[];
   empresa: EmpresaConfig;
+  papelera: PapeleraItem[];
 
   setIva: (iva: number) => void;
   setEmpresa: (data: Partial<EmpresaConfig>) => void;
@@ -149,6 +167,11 @@ export interface AppState {
   addCotizacion: (c: Cotizacion) => void;
   updateCotizacion: (id: string, data: Partial<Cotizacion>) => void;
   removeCotizacion: (id: string) => void;
+
+  // Papelera
+  restorePapelera: (pid: string) => void;
+  removeFromPapelera: (pid: string) => void;
+  vaciarPapelera: () => void;
 
   resetToDefaults: () => void;
 }
@@ -220,7 +243,12 @@ const generateInitialState = () => ({
   historial: [] as Transaccion[],
   cotizaciones: [] as Cotizacion[],
   empresa: { ...DEFAULT_EMPRESA },
+  papelera: [] as PapeleraItem[],
 });
+
+function makePid(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 
 // Helpers para mantener stock/clientes sincronizados con la lista de categorías
 function ensureCategoriaInStock(stock: Stock, cat: string): Stock {
@@ -360,7 +388,22 @@ export const useStore = create<AppState>()(
           proveedores: state.proveedores.map((p) => (p.id === id ? { ...p, ...data } : p)),
         })),
       addProveedor: (proveedor) => set((state) => ({ proveedores: [...state.proveedores, proveedor] })),
-      removeProveedor: (id) => set((state) => ({ proveedores: state.proveedores.filter((p) => p.id !== id) })),
+      removeProveedor: (id) =>
+        set((state) => {
+          const prov = state.proveedores.find((p) => p.id === id);
+          if (!prov) return state;
+          const item: PapeleraItem = {
+            pid: makePid(),
+            tipo: "proveedor",
+            fecha: new Date().toISOString(),
+            resumen: prov.nombre || "Proveedor",
+            data: prov,
+          };
+          return {
+            proveedores: state.proveedores.filter((p) => p.id !== id),
+            papelera: [item, ...(state.papelera || [])],
+          };
+        }),
 
       updateProductoProveedor: (proveedorId, productoId, data) =>
         set((state) => {
@@ -390,13 +433,25 @@ export const useStore = create<AppState>()(
         }),
 
       removeProductoProveedor: (proveedorId, productoId) =>
-        set((state) => ({
-          proveedores: state.proveedores.map((p) =>
+        set((state) => {
+          const prov = state.proveedores.find((p) => p.id === proveedorId);
+          const prod = prov?.productos.find((x) => x.id === productoId);
+          const proveedores = state.proveedores.map((p) =>
             p.id === proveedorId
-              ? { ...p, productos: p.productos.filter((prod) => prod.id !== productoId) }
+              ? { ...p, productos: p.productos.filter((x) => x.id !== productoId) }
               : p
-          ),
-        })),
+          );
+          if (!prod) return { proveedores };
+          const item: PapeleraItem = {
+            pid: makePid(),
+            tipo: "producto",
+            fecha: new Date().toISOString(),
+            resumen: `${prod.nombre}${prov ? ` (${prov.nombre})` : ""}`,
+            data: prod,
+            parentId: proveedorId,
+          };
+          return { proveedores, papelera: [item, ...(state.papelera || [])] };
+        }),
 
       updateCliente: (id, data) =>
         set((state) => ({
@@ -423,7 +478,22 @@ export const useStore = create<AppState>()(
             ],
           };
         }),
-      removeCliente: (id) => set((state) => ({ clientes: state.clientes.filter((c) => c.id !== id) })),
+      removeCliente: (id) =>
+        set((state) => {
+          const cli = state.clientes.find((c) => c.id === id);
+          if (!cli) return state;
+          const item: PapeleraItem = {
+            pid: makePid(),
+            tipo: "cliente",
+            fecha: new Date().toISOString(),
+            resumen: cli.nombre || "Cliente",
+            data: cli,
+          };
+          return {
+            clientes: state.clientes.filter((c) => c.id !== id),
+            papelera: [item, ...(state.papelera || [])],
+          };
+        }),
 
       updateStock: (categoria, cantidad) =>
         set((state) => ({ stock: { ...state.stock, [categoria]: cantidad } })),
@@ -631,9 +701,17 @@ export const useStore = create<AppState>()(
           Object.entries(delta).forEach(([cat, val]) => {
             nuevoStock[cat] = Math.max(0, (nuevoStock[cat] || 0) - (val || 0));
           });
+          const item: PapeleraItem = {
+            pid: makePid(),
+            tipo: "transaccion",
+            fecha: new Date().toISOString(),
+            resumen: `${tx.tipo === "compra" ? "Compra" : tx.tipo === "venta" ? "Venta" : "Ajuste"} — ${tx.detalles || ""}`.trim(),
+            data: tx,
+          };
           return {
             historial: state.historial.filter((t) => t.id !== id),
             stock: nuevoStock,
+            papelera: [item, ...(state.papelera || [])],
           };
         }),
 
@@ -643,13 +721,85 @@ export const useStore = create<AppState>()(
           cotizaciones: state.cotizaciones.map((c) => (c.id === id ? { ...c, ...data } : c)),
         })),
       removeCotizacion: (id) =>
-        set((state) => ({ cotizaciones: state.cotizaciones.filter((c) => c.id !== id) })),
+        set((state) => {
+          const cot = state.cotizaciones.find((c) => c.id === id);
+          if (!cot) return state;
+          const item: PapeleraItem = {
+            pid: makePid(),
+            tipo: "cotizacion",
+            fecha: new Date().toISOString(),
+            resumen: `Cotización ${cot.numero || ""} — ${cot.clienteNombre || ""}`.trim(),
+            data: cot,
+          };
+          return {
+            cotizaciones: state.cotizaciones.filter((c) => c.id !== id),
+            papelera: [item, ...(state.papelera || [])],
+          };
+        }),
+
+      restorePapelera: (pid) =>
+        set((state) => {
+          const item = (state.papelera || []).find((x) => x.pid === pid);
+          if (!item) return state;
+          const papelera = (state.papelera || []).filter((x) => x.pid !== pid);
+          switch (item.tipo) {
+            case "cliente": {
+              const cli = item.data as Cliente;
+              if (state.clientes.some((c) => c.id === cli.id)) return { papelera };
+              return { papelera, clientes: [...state.clientes, cli] };
+            }
+            case "proveedor": {
+              const prov = item.data as Proveedor;
+              if (state.proveedores.some((p) => p.id === prov.id)) return { papelera };
+              return { papelera, proveedores: [...state.proveedores, prov] };
+            }
+            case "producto": {
+              const prod = item.data as ProductoProveedor;
+              const parentId = item.parentId;
+              const target = state.proveedores.find((p) => p.id === parentId);
+              if (!target) return { papelera };
+              if (target.productos.some((x) => x.id === prod.id)) return { papelera };
+              const proveedores = state.proveedores.map((p) =>
+                p.id === parentId ? { ...p, productos: [...p.productos, prod] } : p
+              );
+              return { papelera, proveedores };
+            }
+            case "transaccion": {
+              const tx = item.data as Transaccion;
+              if (state.historial.some((t) => t.id === tx.id)) return { papelera };
+              const delta = tx.stockDelta || {};
+              const nuevoStock: Stock = { ...state.stock };
+              Object.entries(delta).forEach(([cat, val]) => {
+                nuevoStock[cat] = Math.max(0, (nuevoStock[cat] || 0) + (val || 0));
+              });
+              return {
+                papelera,
+                historial: [tx, ...state.historial],
+                stock: nuevoStock,
+              };
+            }
+            case "cotizacion": {
+              const cot = item.data as Cotizacion;
+              if (state.cotizaciones.some((c) => c.id === cot.id)) return { papelera };
+              return { papelera, cotizaciones: [cot, ...state.cotizaciones] };
+            }
+            default:
+              return { papelera };
+          }
+        }),
+
+      removeFromPapelera: (pid) =>
+        set((state) => ({
+          papelera: (state.papelera || []).filter((x) => x.pid !== pid),
+        })),
+
+      vaciarPapelera: () => set({ papelera: [] }),
 
       resetToDefaults: () => set(generateInitialState()),
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 7,
+      version: 8,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -720,6 +870,9 @@ export const useStore = create<AppState>()(
         //     optional ot/facturaCliente/clienteId on Cotizacion — no migration needed
         if (version < 7) {
           state.empresa = state.empresa ?? { ...DEFAULT_EMPRESA };
+        }
+        if (version < 8) {
+          (state as any).papelera = (state as any).papelera ?? [];
         }
         return state as AppState;
       },

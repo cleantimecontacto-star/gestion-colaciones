@@ -13,6 +13,7 @@ import Stock from "@/pages/stock";
 import Historial from "@/pages/historial";
 import Config from "@/pages/config";
 import Cotizaciones from "@/pages/cotizaciones";
+import Papelera from "@/pages/papelera";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/cotizaciones" component={Cotizaciones} />
         <Route path="/stock" component={Stock} />
         <Route path="/historial" component={Historial} />
+        <Route path="/papelera" component={Papelera} />
         <Route path="/config" component={Config} />
         <Route component={NotFound} />
       </Switch>
