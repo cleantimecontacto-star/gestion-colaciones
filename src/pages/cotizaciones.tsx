@@ -519,8 +519,8 @@ export default function Cotizaciones() {
         </div>
       </div>
 
-      {/* Filtros de estado — fila con wrap, sin scroll horizontal */}
-      <div className="flex flex-wrap gap-1.5 w-full pb-1">
+      {/* Filtros de estado — todas las etiquetas en una sola fila, sin scroll */}
+      <div className="flex gap-1 w-full pb-1">
         {(["todas", "borrador", "enviada", "aceptada", "rechazada"] as const).map((estado) => {
           const isActive = filtro === estado;
           let classes: string;
@@ -532,17 +532,18 @@ export default function Cotizaciones() {
             const conf = ESTADO_CONFIG[estado];
             classes = isActive ? conf.filterActive : conf.filterInactive;
           }
+          const count = estado === "todas"
+            ? cotizaciones.length
+            : cotizaciones.filter((c) => c.estado === estado).length;
+          const label = estado === "todas" ? "Todas" : ESTADO_CONFIG[estado].label;
           return (
             <button
               key={estado}
               onClick={() => setFiltro(estado)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${classes}`}
+              className={`flex-1 min-w-0 px-1 py-1 rounded-full text-[10px] sm:text-xs font-medium border transition-colors whitespace-nowrap overflow-hidden text-ellipsis text-center leading-tight ${classes}`}
+              title={`${label} (${count})`}
             >
-              {estado === "todas" ? "Todas" : ESTADO_CONFIG[estado].label}
-              {" "}
-              <span className="opacity-70">
-                ({estado === "todas" ? cotizaciones.length : cotizaciones.filter((c) => c.estado === estado).length})
-              </span>
+              {label} <span className="opacity-70">({count})</span>
             </button>
           );
         })}
