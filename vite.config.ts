@@ -32,7 +32,7 @@ export default defineConfig({
     tailwindcss(),
     ...replitPlugins,
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       includeAssets: [
         "favicon-32.png",
         "apple-touch-icon.png",
@@ -75,8 +75,6 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
