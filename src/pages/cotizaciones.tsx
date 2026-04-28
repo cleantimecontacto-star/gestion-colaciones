@@ -5,7 +5,6 @@ import { formatCLP } from "@/lib/format";
 import { format, addDays } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -33,11 +32,41 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const ESTADO_CONFIG: Record<EstadoCotizacion, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  borrador:   { label: "Borrador",  variant: "secondary" },
-  enviada:    { label: "Enviada",   variant: "default" },
-  aceptada:   { label: "Aceptada", variant: "default" },
-  rechazada:  { label: "Rechazada",variant: "destructive" },
+const ESTADO_CONFIG: Record<EstadoCotizacion, {
+  label: string;
+  variant: "default" | "secondary" | "outline" | "destructive";
+  colorClasses: string;
+  filterActive: string;
+  filterInactive: string;
+}> = {
+  borrador: {
+    label: "Borrador",
+    variant: "secondary",
+    colorClasses: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600",
+    filterActive: "bg-slate-600 text-white border-slate-600",
+    filterInactive: "bg-background text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-slate-500",
+  },
+  enviada: {
+    label: "Enviada",
+    variant: "default",
+    colorClasses: "bg-blue-600 text-white border-blue-600",
+    filterActive: "bg-blue-600 text-white border-blue-600",
+    filterInactive: "bg-background text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700 hover:border-blue-500",
+  },
+  aceptada: {
+    label: "Aceptada",
+    variant: "default",
+    colorClasses: "bg-green-600 text-white border-green-600",
+    filterActive: "bg-green-600 text-white border-green-600",
+    filterInactive: "bg-background text-green-700 dark:text-green-400 border-green-300 dark:border-green-700 hover:border-green-500",
+  },
+  rechazada: {
+    label: "Rechazada",
+    variant: "destructive",
+    colorClasses: "bg-red-600 text-white border-red-600",
+    filterActive: "bg-red-600 text-white border-red-600",
+    filterInactive: "bg-background text-red-700 dark:text-red-400 border-red-300 dark:border-red-700 hover:border-red-500",
+  },
 };
 
 function generarNumero(cotizaciones: Cotizacion[]): string {
@@ -490,25 +519,33 @@ export default function Cotizaciones() {
         </div>
       </div>
 
-      {/* Filtros de estado — una sola fila, scroll horizontal en móvil */}
-      <div className="flex gap-1.5 px-1 overflow-x-auto whitespace-nowrap -mx-1 pb-1">
-        {(["todas", "borrador", "enviada", "aceptada", "rechazada"] as const).map((estado) => (
-          <button
-            key={estado}
-            onClick={() => setFiltro(estado)}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-              filtro === estado
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-muted-foreground border-border hover:border-primary/50"
-            }`}
-          >
-            {estado === "todas" ? "Todas" : ESTADO_CONFIG[estado].label}
-            {" "}
-            <span className="opacity-70">
-              ({estado === "todas" ? cotizaciones.length : cotizaciones.filter((c) => c.estado === estado).length})
-            </span>
-          </button>
-        ))}
+      {/* Filtros de estado — fila con wrap, sin scroll horizontal */}
+      <div className="flex flex-wrap gap-1.5 w-full pb-1">
+        {(["todas", "borrador", "enviada", "aceptada", "rechazada"] as const).map((estado) => {
+          const isActive = filtro === estado;
+          let classes: string;
+          if (estado === "todas") {
+            classes = isActive
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-muted-foreground border-border hover:border-primary/50";
+          } else {
+            const conf = ESTADO_CONFIG[estado];
+            classes = isActive ? conf.filterActive : conf.filterInactive;
+          }
+          return (
+            <button
+              key={estado}
+              onClick={() => setFiltro(estado)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${classes}`}
+            >
+              {estado === "todas" ? "Todas" : ESTADO_CONFIG[estado].label}
+              {" "}
+              <span className="opacity-70">
+                ({estado === "todas" ? cotizaciones.length : cotizaciones.filter((c) => c.estado === estado).length})
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Lista */}
@@ -532,15 +569,9 @@ export default function Cotizaciones() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm font-bold">{cot.numero}</span>
-                        <Badge
-                          variant={conf.variant}
-                          className={`text-[10px] px-1.5 py-0 h-4 ${
-                            cot.estado === "aceptada" ? "bg-green-600 text-white" :
-                            cot.estado === "enviada" ? "bg-blue-600 text-white" : ""
-                          }`}
-                        >
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${conf.colorClasses}`}>
                           {conf.label}
-                        </Badge>
+                        </span>
                       </div>
                       <div className="text-sm font-medium mt-0.5 truncate">{cot.clienteNombre || <span className="text-muted-foreground italic">Sin cliente</span>}</div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
@@ -633,15 +664,9 @@ export default function Cotizaciones() {
             <DialogTitle className="flex items-center gap-2">
               <span>{verCot?.numero}</span>
               {verCot && (
-                <Badge
-                  variant={ESTADO_CONFIG[verCot.estado].variant}
-                  className={`text-[10px] px-1.5 py-0 h-4 ${
-                    verCot.estado === "aceptada" ? "bg-green-600 text-white" :
-                    verCot.estado === "enviada" ? "bg-blue-600 text-white" : ""
-                  }`}
-                >
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${ESTADO_CONFIG[verCot.estado].colorClasses}`}>
                   {ESTADO_CONFIG[verCot.estado].label}
-                </Badge>
+                </span>
               )}
             </DialogTitle>
           </DialogHeader>
