@@ -6,7 +6,7 @@ import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Truck, Tag, Copy, Building2, Image as ImageIcon, Upload, RotateCcw } from "lucide-react";
+import { Trash2, Plus, Truck, Tag, Copy, Building2, Image as ImageIcon, Upload, RotateCcw, RotateCw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { formatCLP } from "@/lib/format";
@@ -692,6 +692,73 @@ export default function Config() {
                   </div>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="p-3 border-b border-border/50">
+              <CardTitle className="text-base flex items-center gap-2">
+                <RotateCw className="h-4 w-4" />
+                Actualizaciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 text-sm">
+              <p className="text-muted-foreground mb-3">
+                Buscá si hay una versión nueva de la app. Si la hay, aparecerá un cartelito
+                para actualizar.
+              </p>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={async () => {
+                  if (!("serviceWorker" in navigator)) {
+                    toast({
+                      title: "No soportado",
+                      description: "Tu navegador no soporta actualizaciones automáticas.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  toast({
+                    title: "Buscando actualizaciones…",
+                    description: "Esto toma unos segundos.",
+                  });
+                  try {
+                    const reg = await navigator.serviceWorker.getRegistration();
+                    if (!reg) {
+                      toast({
+                        title: "Sin service worker",
+                        description: "No hay actualizaciones disponibles aún.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    await reg.update();
+                    setTimeout(() => {
+                      if (reg.installing || reg.waiting) {
+                        toast({
+                          title: "¡Hay una nueva versión!",
+                          description: 'Tocá "Actualizar" en el cartelito.',
+                        });
+                      } else {
+                        toast({
+                          title: "Ya estás en la última versión",
+                          description: "No hay actualizaciones pendientes.",
+                        });
+                      }
+                    }, 1500);
+                  } catch {
+                    toast({
+                      title: "Error",
+                      description: "No se pudo buscar actualizaciones.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <RotateCw className="h-4 w-4 mr-2" />
+                Buscar actualización
+              </Button>
             </CardContent>
           </Card>
 
