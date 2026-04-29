@@ -228,6 +228,7 @@ const DEFAULT_PROVEEDORES: Proveedor[] = [
       { id: "pp-09", nombre: "Tapadito queso crema aceituna salame",precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
       { id: "pp-10", nombre: "Tapadito choclo palmito mayo",        precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
       { id: "pp-11", nombre: "Mini pizza base",                     precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
+    ],
   },
   {
     id: "feria-fruta",
