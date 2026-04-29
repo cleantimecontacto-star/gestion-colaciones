@@ -1,28 +1,38 @@
 /**
  * Cliente para la API de documentos en Convex.
  *
- * Reutiliza el mismo deployment de Convex compartido entre las apps
- * (mismo backend que cleantime-hub). Las funciones `documents:*` y las
- * tablas `docCategories` / `documents` ya están desplegadas allí.
+ * Usa exclusivamente el deployment propio de esta app (configurado vía
+ * VITE_CONVEX_URL en Vercel). NO comparte datos con otras apps.
  *
- * Si VITE_CONVEX_URL no está definida, las llamadas fallarán: la pantalla
- * de documentos requiere conexión a la nube (los archivos se guardan en
- * Convex Storage, no en localStorage).
+ * Las tablas `docCategories` / `documents` y las funciones `documents:*`
+ * se despliegan automáticamente cuando Vercel hace `convex deploy`
+ * (ver build script de package.json).
  */
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi } from "convex/server";
 
-const CONVEX_URL =
-  (import.meta.env.VITE_CONVEX_URL as string | undefined) ??
-  "https://polite-ocelot-652.eu-west-1.convex.cloud";
+const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string | undefined) ?? "";
+
+export class DocumentsConfigError extends Error {
+  constructor() {
+    super(
+      "La nube no está configurada para esta app (falta VITE_CONVEX_URL). " +
+        "Los documentos se guardan en la nube y no en este dispositivo."
+    );
+    this.name = "DocumentsConfigError";
+  }
+}
 
 let _client: ConvexHttpClient | null = null;
 function getClient(): ConvexHttpClient {
+  if (!CONVEX_URL) throw new DocumentsConfigError();
   if (!_client) {
     _client = new ConvexHttpClient(CONVEX_URL);
   }
   return _client;
 }
+
+export const documentsConfigured = !!CONVEX_URL;
 
 export type DocCategoryId = string & { __brand: "docCategoryId" };
 export type DocumentId = string & { __brand: "documentId" };

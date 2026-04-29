@@ -50,6 +50,8 @@ import {
   addCategory as apiAddCategory,
   deleteCategory as apiDeleteCategory,
   deleteDocument as apiDeleteDocument,
+  documentsConfigured,
+  DocumentsConfigError,
   formatSize,
   getDownloadUrl,
   listCategories,
@@ -157,7 +159,21 @@ export default function Documentos() {
         setDocs(list);
       } catch (e) {
         console.error("Error cargando documentos:", e);
-        if (!cancelled) setError("No se pudieron cargar los documentos. Verifica tu conexión.");
+        if (!cancelled) {
+          if (e instanceof DocumentsConfigError) {
+            setError(e.message);
+          } else if (!documentsConfigured) {
+            setError(
+              "La nube no está configurada para esta app (falta VITE_CONVEX_URL)."
+            );
+          } else {
+            const msg = e instanceof Error ? e.message : String(e);
+            setError(
+              "No se pudieron cargar los documentos. Verifica tu conexión.\n\nDetalle: " +
+                msg
+            );
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
