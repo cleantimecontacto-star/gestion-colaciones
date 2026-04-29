@@ -824,7 +824,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 8,
+      version: 9,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -898,6 +898,25 @@ export const useStore = create<AppState>()(
         }
         if (version < 8) {
           (state as any).papelera = (state as any).papelera ?? [];
+        }
+        if (version < 9) {
+          // Reemplaza proveedores con los datos reales de Sra Loyda + Producción propia.
+          // Clientes, historial, cotizaciones y empresa se conservan intactos.
+          state.proveedores = DEFAULT_PROVEEDORES;
+          state.categorias = [...DEFAULT_CATEGORIAS];
+          // Asegurar que stock tenga las categorías nuevas
+          const st = (state.stock || {}) as Record<string, number>;
+          if (st["Dulces"] === undefined) st["Dulces"] = 0;
+          if (st["Salados"] === undefined) st["Salados"] = 0;
+          state.stock = st;
+          // Asegurar que los clientes existentes tengan las nuevas categorías
+          if (Array.isArray(state.clientes)) {
+            state.clientes = state.clientes.map((c: any) => ({
+              ...c,
+              config: { Dulces: c.config?.Dulces ?? 0, Salados: c.config?.Salados ?? 0 },
+              precios: { Dulces: c.precios?.Dulces ?? 700, Salados: c.precios?.Salados ?? 700 },
+            }));
+          }
         }
         return state as AppState;
       },
