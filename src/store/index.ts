@@ -176,7 +176,7 @@ export interface AppState {
   resetToDefaults: () => void;
 }
 
-const DEFAULT_CATEGORIAS = ["Dulces", "Salados"];
+const DEFAULT_CATEGORIAS = ["Dulces", "Salados", "Fruta", "Snack", "Barra"];
 
 const DEFAULT_PROVEEDORES: Proveedor[] = [
   {
@@ -228,6 +228,49 @@ const DEFAULT_PROVEEDORES: Proveedor[] = [
       { id: "pp-09", nombre: "Tapadito queso crema aceituna salame",precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
       { id: "pp-10", nombre: "Tapadito choclo palmito mayo",        precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
       { id: "pp-11", nombre: "Mini pizza base",                     precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
+  },
+  {
+    id: "feria-fruta",
+    nombre: "Feria Fruta",
+    despachoBase: 0,
+    despachoKilosBase: 0,
+    despachoPorKiloExtra: 0,
+    productos: [
+      { id: "ff-01", nombre: "Fruta (unidad)", precio: 200, precioIncluyeIva: false, unidades: 1, categoria: "Fruta" },
+    ],
+  },
+  {
+    id: "tribu-snack",
+    nombre: "Tribu de Snack",
+    despachoBase: 0,
+    despachoKilosBase: 0,
+    despachoPorKiloExtra: 0,
+    productos: [
+      { id: "ts-01", nombre: "Mix Cajuna 30g",                    precio: 361, precioIncluyeIva: true, unidades: 1, categoria: "Snack" },
+      { id: "ts-02", nombre: "Mix Power Mix 30g",                 precio: 361, precioIncluyeIva: true, unidades: 1, categoria: "Snack" },
+      { id: "ts-03", nombre: "Mix Puro Nuts 30g",                 precio: 361, precioIncluyeIva: true, unidades: 1, categoria: "Snack" },
+      { id: "ts-04", nombre: "Mix Frutos del Bosque 30g",         precio: 361, precioIncluyeIva: true, unidades: 1, categoria: "Snack" },
+      { id: "ts-05", nombre: "Tribu 30g",                         precio: 361, precioIncluyeIva: true, unidades: 1, categoria: "Snack" },
+      { id: "ts-06", nombre: "Bosque Tribú 30g",                  precio: 361, precioIncluyeIva: true, unidades: 1, categoria: "Snack" },
+      { id: "ts-07", nombre: "Barra Cereal Chocolate Chip 20g",   precio: 190, precioIncluyeIva: true, unidades: 1, categoria: "Barra" },
+      { id: "ts-08", nombre: "Barra Cereal Berries 20g",          precio: 190, precioIncluyeIva: true, unidades: 1, categoria: "Barra" },
+    ],
+  },
+  {
+    id: "maifud",
+    nombre: "Maifud",
+    despachoBase: 3000,
+    despachoKilosBase: 24,
+    despachoPorKiloExtra: 200,
+    productos: [
+      { id: "mf-01", nombre: "Fruta Mix 6 Kg (30-40 un)",         precio: 11990, precioIncluyeIva: false, unidades: 35, categoria: "Fruta" },
+      { id: "mf-02", nombre: "Fruta Mix 8 Kg (40-50 un)",         precio: 14990, precioIncluyeIva: false, unidades: 45, categoria: "Fruta" },
+      { id: "mf-03", nombre: "Fruta Mix 10 Kg (50-60 un)",        precio: 18990, precioIncluyeIva: false, unidades: 55, categoria: "Fruta" },
+      { id: "mf-04", nombre: "Fruta Mix 12 Kg (60-70 un)",        precio: 21990, precioIncluyeIva: false, unidades: 65, categoria: "Fruta" },
+      { id: "mf-05", nombre: "Fruta Mix 6Kg + Snacks Mix 16u",    precio: 22990, precioIncluyeIva: false, unidades: 51, categoria: "Fruta" },
+      { id: "mf-06", nombre: "Snacks Mix 60 Un",                  precio: 37990, precioIncluyeIva: false, unidades: 60, categoria: "Snack" },
+      { id: "mf-07", nombre: "Snacks Mix 40 Un",                  precio: 26990, precioIncluyeIva: false, unidades: 40, categoria: "Snack" },
+      { id: "mf-08", nombre: "Verduras Mix 6 Kg",                 precio: 10990, precioIncluyeIva: false, unidades: 1,  categoria: "Fruta" },
     ],
   },
 ];
@@ -264,7 +307,7 @@ const generateInitialState = () => ({
   categorias: [...DEFAULT_CATEGORIAS],
   proveedores: DEFAULT_PROVEEDORES,
   clientes: DEFAULT_CLIENTES,
-  stock: { Dulces: 0, Salados: 0 } as Stock,
+  stock: { Dulces: 0, Salados: 0, Fruta: 0, Snack: 0, Barra: 0 } as Stock,
   historial: [] as Transaccion[],
   cotizaciones: [] as Cotizacion[],
   empresa: { ...DEFAULT_EMPRESA },
@@ -824,7 +867,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 9,
+      version: 10,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -915,6 +958,36 @@ export const useStore = create<AppState>()(
               ...c,
               config: { Dulces: c.config?.Dulces ?? 0, Salados: c.config?.Salados ?? 0 },
               precios: { Dulces: c.precios?.Dulces ?? 700, Salados: c.precios?.Salados ?? 700 },
+            }));
+          }
+        }
+        if (version < 10) {
+          // Agregar categorías Fruta, Snack, Barra si no existen
+          const cats: string[] = state.categorias ?? [...DEFAULT_CATEGORIAS];
+          ["Fruta", "Snack", "Barra"].forEach((cat) => {
+            if (!cats.includes(cat)) cats.push(cat);
+          });
+          state.categorias = cats;
+          // Agregar proveedores nuevos SIN borrar los existentes
+          const provIds = new Set(((state.proveedores as Proveedor[]) ?? []).map((p) => p.id));
+          const newProvs = DEFAULT_PROVEEDORES.filter((p) => ["feria-fruta", "tribu-snack", "maifud"].includes(p.id));
+          newProvs.forEach((prov) => {
+            if (!provIds.has(prov.id)) {
+              (state.proveedores as Proveedor[]) = [...((state.proveedores as Proveedor[]) ?? []), prov];
+            }
+          });
+          // Asegurar stock para nuevas categorías
+          const stk = (state.stock || {}) as Record<string, number>;
+          ["Fruta", "Snack", "Barra"].forEach((cat) => {
+            if (stk[cat] === undefined) stk[cat] = 0;
+          });
+          state.stock = stk;
+          // Asegurar que los clientes tengan las nuevas categorías
+          if (Array.isArray(state.clientes)) {
+            state.clientes = state.clientes.map((c: any) => ({
+              ...c,
+              config:  { Fruta: 0, Snack: 0, Barra: 0, ...c.config },
+              precios: { Fruta: 0, Snack: 0, Barra: 0, ...c.precios },
             }));
           }
         }
