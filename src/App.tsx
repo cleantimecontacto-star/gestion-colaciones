@@ -15,6 +15,7 @@ import Stock from "@/pages/stock";
 import Historial from "@/pages/historial";
 import Config from "@/pages/config";
 import Cotizaciones from "@/pages/cotizaciones";
+import Documentos from "@/pages/documentos";
 import Papelera from "@/pages/papelera";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,9 @@ function Router() {
         </Route>
         <Route path="/historial">
           <ProtectedRoute component={Historial} name="Historial" />
+        </Route>
+        <Route path="/documentos">
+          <ProtectedRoute component={Documentos} name="Documentos" />
         </Route>
         <Route path="/papelera">
           <ProtectedRoute component={Papelera} name="Papelera" />
