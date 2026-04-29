@@ -176,60 +176,9 @@ export interface AppState {
   resetToDefaults: () => void;
 }
 
-const DEFAULT_CATEGORIAS = ["Dulces", "Salados", "Fruta", "Snack", "Barra"];
+const DEFAULT_CATEGORIAS = ["Fruta", "Snack", "Barra"];
 
 const DEFAULT_PROVEEDORES: Proveedor[] = [
-  {
-    id: "sra-loyda",
-    nombre: "Sra Loyda",
-    despachoBase: 0,
-    despachoKilosBase: 0,
-    despachoPorKiloExtra: 0,
-    productos: [
-      { id: "sl-01", nombre: "Cachitos",                       precio: 200, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-02", nombre: "Berlines fritos",                precio: 200, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-03", nombre: "Berlines horno",                 precio: 250, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-04", nombre: "Profiteroles",                   precio: 200, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-05", nombre: "Éclair",                         precio: 300, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-06", nombre: "Mini brazo reina",               precio: 300, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-07", nombre: "Donas bañadas",                  precio: 200, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-08", nombre: "Donas mil hojas",                precio: 200, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-09", nombre: "Pañuelitos",                     precio: 300, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-10", nombre: "Mini alfajor chocolate",         precio: 250, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-11", nombre: "Mini alfajor maizena",           precio: 200, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-12", nombre: "Mantecados",                     precio: 150, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-13", nombre: "Mini chilenitos",                precio: 250, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-14", nombre: "Mini chilenitos mil hojas",      precio: 250, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-15", nombre: "Empanadas mil hojas",            precio: 400, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-16", nombre: "Mini empolvado",                 precio: 300, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-17", nombre: "Mini kuguen",                    precio: 400, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-18", nombre: "Mini tartaleta",                 precio: 400, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-19", nombre: "Mini pie limón",                 precio: 400, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-20", nombre: "Keipop",                         precio: 250, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-21", nombre: "Capquei",                        precio: 250, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "sl-22", nombre: "Mini torta yogurt",              precio: 300, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-    ],
-  },
-  {
-    id: "produccion-propia",
-    nombre: "Producción propia",
-    despachoBase: 0,
-    despachoKilosBase: 0,
-    despachoPorKiloExtra: 0,
-    productos: [
-      { id: "pp-01", nombre: "Brownie banana cacao",                precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "pp-02", nombre: "Brownie normal",                      precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Dulces" },
-      { id: "pp-03", nombre: "Tapadito ave mayo ciboulette",        precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-04", nombre: "Tapadito huevo mayo palmito",         precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-05", nombre: "Tapadito huevo mayo palta",           precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-06", nombre: "Tapadito carne queso",                precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-07", nombre: "Tapadito lechuga tomate carne",       precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-08", nombre: "Tapadito tomate queso albahaca",      precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-09", nombre: "Tapadito queso crema aceituna salame",precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-10", nombre: "Tapadito choclo palmito mayo",        precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-      { id: "pp-11", nombre: "Mini pizza base",                     precio: 0, precioIncluyeIva: false, unidades: 1, categoria: "Salados" },
-    ],
-  },
   {
     id: "feria-fruta",
     nombre: "Feria Fruta",
@@ -282,8 +231,8 @@ const DEFAULT_CLIENTES: Cliente[] = [
     nombre: "Cliente Demo",
     diasEntrega: 4,
     entregasPorSemana: 2,
-    config: { Dulces: 50, Salados: 50 },
-    precios: { Dulces: 700, Salados: 700 },
+    config: { Fruta: 0, Snack: 0, Barra: 0 },
+    precios: { Fruta: 0, Snack: 0, Barra: 0 },
     modoCobro: "paquete",
     paquete: {
       unidades: 50,
@@ -308,7 +257,7 @@ const generateInitialState = () => ({
   categorias: [...DEFAULT_CATEGORIAS],
   proveedores: DEFAULT_PROVEEDORES,
   clientes: DEFAULT_CLIENTES,
-  stock: { Dulces: 0, Salados: 0, Fruta: 0, Snack: 0, Barra: 0 } as Stock,
+  stock: { Fruta: 0, Snack: 0, Barra: 0 } as Stock,
   historial: [] as Transaccion[],
   cotizaciones: [] as Cotizacion[],
   empresa: { ...DEFAULT_EMPRESA },
@@ -868,7 +817,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 10,
+      version: 11,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -950,17 +899,7 @@ export const useStore = create<AppState>()(
           state.categorias = [...DEFAULT_CATEGORIAS];
           // Asegurar que stock tenga las categorías nuevas
           const st = (state.stock || {}) as Record<string, number>;
-          if (st["Dulces"] === undefined) st["Dulces"] = 0;
-          if (st["Salados"] === undefined) st["Salados"] = 0;
           state.stock = st;
-          // Asegurar que los clientes existentes tengan las nuevas categorías
-          if (Array.isArray(state.clientes)) {
-            state.clientes = state.clientes.map((c: any) => ({
-              ...c,
-              config: { Dulces: c.config?.Dulces ?? 0, Salados: c.config?.Salados ?? 0 },
-              precios: { Dulces: c.precios?.Dulces ?? 700, Salados: c.precios?.Salados ?? 700 },
-            }));
-          }
         }
         if (version < 10) {
           // Agregar categorías Fruta, Snack, Barra si no existen
@@ -992,7 +931,34 @@ export const useStore = create<AppState>()(
             }));
           }
         }
-        return state as AppState;
+        if (version < 11) {
+          // Eliminar categorías Dulces y Salados
+          if (Array.isArray(state.categorias)) {
+            state.categorias = state.categorias.filter((c: string) => c !== "Dulces" && c !== "Salados");
+          }
+          // Eliminar proveedores Sra Loyda y Producción propia
+          if (Array.isArray(state.proveedores)) {
+            state.proveedores = (state.proveedores as Proveedor[]).filter(
+              (p) => p.id !== "sra-loyda" && p.id !== "produccion-propia"
+            );
+          }
+          // Eliminar Dulces/Salados del stock
+          const stk11 = (state.stock || {}) as Record<string, number>;
+          delete stk11["Dulces"];
+          delete stk11["Salados"];
+          state.stock = stk11;
+          // Eliminar Dulces/Salados de config/precios de cada cliente
+          if (Array.isArray(state.clientes)) {
+            state.clientes = state.clientes.map((c: any) => {
+              const cfg = { ...c.config };
+              const prc = { ...c.precios };
+              delete cfg["Dulces"]; delete cfg["Salados"];
+              delete prc["Dulces"]; delete prc["Salados"];
+              return { ...c, config: cfg, precios: prc };
+            });
+          }
+        }
+                return state as AppState;
       },
     }
   )
