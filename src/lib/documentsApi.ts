@@ -99,6 +99,13 @@ export async function deleteDocument(id: DocumentId): Promise<void> {
   await getClient().mutation(anyApi.documents.deleteDocument, { id });
 }
 
+export async function moveDocument(
+  id: DocumentId,
+  categoryId: DocCategoryId
+): Promise<void> {
+  await getClient().mutation(anyApi.documents.moveDocument, { id, categoryId });
+}
+
 export async function getDownloadUrl(storageId: StorageId): Promise<string | null> {
   return (await getClient().query(anyApi.documents.getDownloadUrl, { storageId })) as
     | string

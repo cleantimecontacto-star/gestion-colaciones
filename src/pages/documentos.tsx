@@ -11,6 +11,7 @@ import {
   FileText,
   FileImage,
   File as FileIcon,
+  FolderInput,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ import {
   addCategory as apiAddCategory,
   deleteCategory as apiDeleteCategory,
   deleteDocument as apiDeleteDocument,
+  moveDocument as apiMoveDocument,
   documentsConfigured,
   DocumentsConfigError,
   formatSize,
@@ -129,6 +131,8 @@ export default function Documentos() {
   } | null>(null);
 
   // Delete document
+  const [moveTarget, setMoveTarget] = useState<{ id: DocumentId; name: string; categoryId: DocCategoryId } | null>(null);
+  const [moveTargetCat, setMoveTargetCat] = useState<DocCategoryId | "">("");
   const [deleteDocTarget, setDeleteDocTarget] = useState<{ id: DocumentId; name: string } | null>(
     null
   );
@@ -589,6 +593,18 @@ export default function Documentos() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => {
+                        setMoveTarget({ id: doc._id, name: doc.name, categoryId: doc.categoryId });
+                        setMoveTargetCat(doc.categoryId);
+                      }}
+                      title="Mover a otra categoría"
+                    >
+                      <FolderInput className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={() => setDeleteDocTarget({ id: doc._id, name: doc.name })}
                       title="Eliminar"
@@ -690,6 +706,49 @@ export default function Documentos() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Mover documento a otra categoría */}
+      <Dialog open={!!moveTarget} onOpenChange={(o) => !o && setMoveTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mover documento</DialogTitle>
+          </DialogHeader>
+          <div className="text-xs text-muted-foreground bg-muted rounded px-3 py-2 truncate">
+            {moveTarget?.name}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Categoría destino</Label>
+            <select
+              value={moveTargetCat}
+              onChange={(e) => setMoveTargetCat(e.target.value as DocCategoryId)}
+              className="border border-border rounded-md px-3 py-2 text-sm bg-background w-full"
+            >
+              {categories.map((cat) => (
+                <option key={cat._id} value={cat._id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveTarget(null)}>Cancelar</Button>
+            <Button
+              disabled={!moveTarget || !moveTargetCat || moveTargetCat === moveTarget?.categoryId}
+              onClick={async () => {
+                if (!moveTarget || !moveTargetCat) return;
+                try {
+                  await apiMoveDocument(moveTarget.id, moveTargetCat as DocCategoryId);
+                  toast({ title: "Documento movido" });
+                  setMoveTarget(null);
+                  await reloadDocs(selectedCat);
+                } catch (e) {
+                  toast({ title: "Error al mover", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+                }
+              }}
+            >
+              Mover
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmar eliminar documento */}
       <AlertDialog

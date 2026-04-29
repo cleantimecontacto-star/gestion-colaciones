@@ -99,3 +99,11 @@ export const getDownloadUrl = query({
     return await ctx.storage.getUrl(storageId);
   },
 });
+
+/** Mueve un documento a otra categoría (solo cambia categoryId, no el archivo). */
+export const moveDocument = mutation({
+  args: { id: v.id("documents"), categoryId: v.id("docCategories") },
+  handler: async (ctx, { id, categoryId }) => {
+    await ctx.db.patch(id, { categoryId });
+  },
+});
