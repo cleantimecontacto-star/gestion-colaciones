@@ -204,7 +204,7 @@ async function construirPDF(cot: Cotizacion, empresa: EmpresaConfig) {
     y += 5;
     if (cot.ot) {
       doc.setFont("helvetica", "bold");
-      doc.text(`OT: ${cot.ot}`, 14, y);
+      doc.text(`OT/OC: ${cot.ot}`, 14, y);
       doc.setFont("helvetica", "normal");
       y += 4;
     }
@@ -404,7 +404,7 @@ export default function Cotizaciones() {
         RUT: c.clienteRut,
         Email: c.clienteEmail,
         Dirección: c.clienteDireccion,
-        OT: c.ot || "",
+        "OT/OC": c.ot || "",
         "Factura Cliente": c.facturaCliente || "",
         "IVA %": c.ivaPorcentaje,
         Neto: round(neto),
@@ -578,7 +578,7 @@ export default function Cotizaciones() {
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                         <span>{format(new Date(cot.fecha), "dd/MM/yyyy")}</span>
                         {cot.clienteRut && <span>{cot.clienteRut}</span>}
-                        {cot.ot && <span className="font-mono bg-muted rounded px-1">OT: {cot.ot}</span>}
+                        {cot.ot && <span className="font-mono bg-muted rounded px-1">OT/OC: {cot.ot}</span>}
                         {cot.facturaCliente && <span className="font-mono bg-muted rounded px-1">Fctr: {cot.facturaCliente}</span>}
                         <span className="font-semibold text-foreground">{formatCLP(total)}</span>
                       </div>
@@ -686,7 +686,7 @@ export default function Cotizaciones() {
                   {verCot.clienteRut && <p className="text-muted-foreground">RUT: {verCot.clienteRut}</p>}
                   {verCot.clienteEmail && <p className="text-muted-foreground">{verCot.clienteEmail}</p>}
                   {verCot.clienteDireccion && <p className="text-muted-foreground">{verCot.clienteDireccion}</p>}
-                  {verCot.ot && <p className="text-muted-foreground">OT: {verCot.ot}</p>}
+                  {verCot.ot && <p className="text-muted-foreground">OT/OC: {verCot.ot}</p>}
                   {verCot.facturaCliente && <p className="text-muted-foreground">Factura: {verCot.facturaCliente}</p>}
                 </div>
                 {/* Ítems */}
@@ -854,11 +854,11 @@ export default function Cotizaciones() {
               {/* OT y Factura */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">OT (Orden de Trabajo)</Label>
+                  <Label className="text-xs text-muted-foreground">OT/OC (Orden de Trabajo / Orden de Compra)</Label>
                   <Input
                     value={form.ot ?? ""}
                     onChange={(e) => setForm({ ...form, ot: e.target.value })}
-                    placeholder="Ej: OT-2024-001"
+                    placeholder="Ej: OT-2024-001 / OC-2024-001"
                     className="h-8 text-sm mt-0.5"
                   />
                 </div>
