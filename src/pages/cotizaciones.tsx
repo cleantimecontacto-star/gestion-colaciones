@@ -209,7 +209,7 @@ async function construirPDF(cot: Cotizacion, empresa: EmpresaConfig) {
       y += 4;
     }
     if (cot.facturaCliente) {
-      doc.text(`Factura cliente: ${cot.facturaCliente}`, 14, y);
+      doc.text(`Factura Serendipia: ${cot.facturaCliente}`, 14, y);
       y += 4;
     }
     y += 4;
@@ -405,7 +405,7 @@ export default function Cotizaciones() {
         Email: c.clienteEmail,
         Dirección: c.clienteDireccion,
         "OT/OC": c.ot || "",
-        "Factura Cliente": c.facturaCliente || "",
+        "Factura Serendipia": c.facturaCliente || "",
         "IVA %": c.ivaPorcentaje,
         Neto: round(neto),
         IVA: round(iva),
@@ -579,7 +579,7 @@ export default function Cotizaciones() {
                         <span>{format(new Date(cot.fecha), "dd/MM/yyyy")}</span>
                         {cot.clienteRut && <span>{cot.clienteRut}</span>}
                         {cot.ot && <span className="font-mono bg-muted rounded px-1">OT/OC: {cot.ot}</span>}
-                        {cot.facturaCliente && <span className="font-mono bg-muted rounded px-1">Fctr: {cot.facturaCliente}</span>}
+                        {cot.facturaCliente && <span className="font-mono bg-muted rounded px-1">Fact. Serendipia: {cot.facturaCliente}</span>}
                         <span className="font-semibold text-foreground">{formatCLP(total)}</span>
                       </div>
                     </div>
@@ -687,7 +687,7 @@ export default function Cotizaciones() {
                   {verCot.clienteEmail && <p className="text-muted-foreground">{verCot.clienteEmail}</p>}
                   {verCot.clienteDireccion && <p className="text-muted-foreground">{verCot.clienteDireccion}</p>}
                   {verCot.ot && <p className="text-muted-foreground">OT/OC: {verCot.ot}</p>}
-                  {verCot.facturaCliente && <p className="text-muted-foreground">Factura: {verCot.facturaCliente}</p>}
+                  {verCot.facturaCliente && <p className="text-muted-foreground">Factura Serendipia: {verCot.facturaCliente}</p>}
                 </div>
                 {/* Ítems */}
                 <div className="rounded-lg border border-border overflow-hidden">
@@ -854,20 +854,20 @@ export default function Cotizaciones() {
               {/* OT y Factura */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">OT/OC (Orden de Trabajo / Orden de Compra)</Label>
+                  <Label className="text-xs text-muted-foreground">OT/OC</Label>
                   <Input
                     value={form.ot ?? ""}
                     onChange={(e) => setForm({ ...form, ot: e.target.value })}
-                    placeholder="Ej: OT-2024-001 / OC-2024-001"
+                    placeholder="Ingresa el número"
                     className="h-8 text-sm mt-0.5"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Factura Cliente</Label>
+                  <Label className="text-xs text-muted-foreground">Factura Serendipia</Label>
                   <Input
                     value={form.facturaCliente ?? ""}
                     onChange={(e) => setForm({ ...form, facturaCliente: e.target.value })}
-                    placeholder="Nº factura emitida por cliente"
+                    placeholder="N° factura emitida por Serendipia"
                     className="h-8 text-sm mt-0.5"
                   />
                 </div>
