@@ -89,115 +89,116 @@ export default function Historial() {
       id ? clientes.find((c) => c.id === id)?.nombre ?? "" : "";
 
     const fechaFmt = (iso: string) => format(new Date(iso), "dd-MM-yyyy HH:mm");
-    const round = (n: number) => Math.round(n);
+    const clp = (n: number) => Math.round(n);
 
     const ventas = historial.filter((t) => t.tipo === "venta");
     const compras = historial.filter((t) => t.tipo === "compra");
 
-    // Hoja: Resumen
-    const totalVentasNeto = ventas.reduce((a, t) => a + t.montoNeto, 0);
-    const totalVentasIva = ventas.reduce((a, t) => a + t.iva, 0);
+    // ── Cálculos globales ──────────────────────────────────────────
+    const totalVentasNeto  = ventas.reduce((a, t) => a + t.montoNeto, 0);
+    const totalVentasIva   = ventas.reduce((a, t) => a + t.iva, 0);
     const totalVentasTotal = ventas.reduce((a, t) => a + t.montoTotal, 0);
-    const totalComprasNeto = compras.reduce((a, t) => a + t.montoNeto, 0);
-    const totalComprasIva = compras.reduce((a, t) => a + t.iva, 0);
+    const totalComprasNeto  = compras.reduce((a, t) => a + t.montoNeto, 0);
+    const totalComprasIva   = compras.reduce((a, t) => a + t.iva, 0);
     const totalComprasTotal = compras.reduce((a, t) => a + t.montoTotal, 0);
     const utilidadNeta = totalVentasNeto - totalComprasNeto;
     const margen = totalVentasNeto > 0 ? (utilidadNeta / totalVentasNeto) * 100 : 0;
     const ivaAPagar = totalVentasIva - totalComprasIva;
 
-    const resumen = [
-      { Concepto: "Total ventas (neto)", Valor: round(totalVentasNeto) },
-      { Concepto: "IVA débito (ventas)", Valor: round(totalVentasIva) },
-      { Concepto: "Total ventas (c/IVA)", Valor: round(totalVentasTotal) },
-      { Concepto: "Total compras (neto)", Valor: round(totalComprasNeto) },
-      { Concepto: "IVA crédito (compras)", Valor: round(totalComprasIva) },
-      { Concepto: "Total compras (c/IVA)", Valor: round(totalComprasTotal) },
-      { Concepto: "Utilidad neta", Valor: round(utilidadNeta) },
-      { Concepto: "Margen %", Valor: Number(margen.toFixed(2)) },
-      { Concepto: "IVA a pagar (positivo) / a favor (negativo)", Valor: round(ivaAPagar) },
-      { Concepto: "Cantidad de ventas", Valor: ventas.length },
-      { Concepto: "Cantidad de compras", Valor: compras.length },
-    ];
-
-    // Reunir todas las categorías que aparecen en el historial + las actuales
+    // ── Categorías ─────────────────────────────────────────────────
     const categoriasUsadas = new Set<string>(categorias);
     historial.forEach((t) => {
-      if (t.stockDelta) {
-        Object.keys(t.stockDelta).forEach((k) => categoriasUsadas.add(k));
-      }
+      if (t.stockDelta) Object.keys(t.stockDelta).forEach((k) => categoriasUsadas.add(k));
     });
-    const categoriasOrden = Array.from(categoriasUsadas);
+    const cats = Array.from(categoriasUsadas);
 
-    // Hoja: Ventas / Entregas
-    const ventasRows = ventas.map((t) => {
-      const row: Record<string, string | number> = {
-        Fecha: fechaFmt(t.fecha),
-        Cliente: clienteNombre(t.clienteId),
-        Detalle: t.detalles,
-      };
-      categoriasOrden.forEach((cat) => {
-        row[`${cat} (un)`] = Math.abs(t.stockDelta?.[cat] ?? 0);
-      });
-      row.Neto = round(t.montoNeto);
-      row.IVA = round(t.iva);
-      row.Total = round(t.montoTotal);
-      return row;
-    });
-
-    // Hoja: Compras / Costos
-    const comprasRows = compras.map((t) => {
-      const row: Record<string, string | number> = {
-        Fecha: fechaFmt(t.fecha),
-        Detalle: t.detalles,
-      };
-      categoriasOrden.forEach((cat) => {
-        row[`${cat} (un)`] = t.stockDelta?.[cat] ?? 0;
-      });
-      row.Neto = round(t.montoNeto);
-      row.IVA = round(t.iva);
-      row.Total = round(t.montoTotal);
-      return row;
-    });
-
-    // Hoja: Ganancias por cliente
+    // ── Ventas por cliente (ordenadas de mayor a menor) ────────────
     const porCliente = new Map<string, { ventas: number; iva: number; total: number; entregas: number }>();
     ventas.forEach((t) => {
       const key = clienteNombre(t.clienteId) || "Sin cliente";
       const cur = porCliente.get(key) ?? { ventas: 0, iva: 0, total: 0, entregas: 0 };
-      cur.ventas += t.montoNeto;
-      cur.iva += t.iva;
-      cur.total += t.montoTotal;
+      cur.ventas  += t.montoNeto;
+      cur.iva     += t.iva;
+      cur.total   += t.montoTotal;
       cur.entregas += 1;
       porCliente.set(key, cur);
     });
-    const gananciasRows = Array.from(porCliente.entries())
-      .map(([cliente, v]) => ({
-        Cliente: cliente,
-        Entregas: v.entregas,
-        "Ventas neto": round(v.ventas),
-        IVA: round(v.iva),
-        "Ventas total": round(v.total),
-      }))
-      .sort((a, b) => b["Ventas neto"] - a["Ventas neto"]);
+    const clientesOrdenados = Array.from(porCliente.entries())
+      .sort((a, b) => b[1].ventas - a[1].ventas);
 
-    // Hoja: Histórico completo
-    const historicoRows = historial.map((t) => ({
-      Fecha: fechaFmt(t.fecha),
-      Tipo: t.tipo,
-      Cliente: clienteNombre(t.clienteId),
-      Detalle: t.detalles,
-      Neto: round(t.montoNeto),
-      IVA: round(t.iva),
-      Total: round(t.montoTotal),
-    }));
+    // ── Construcción de la hoja única (AOA) ───────────────────────
+    type Row = (string | number | null)[];
+    const rows: Row[] = [];
 
+    const sep = () => rows.push([]);
+    const titulo = (t: string) => rows.push([t]);
+    const encabezado = (...cols: string[]) => rows.push(cols);
+
+    // ── 1. RESUMEN FINANCIERO ──────────────────────────────────────
+    titulo("RESUMEN FINANCIERO");
+    encabezado("Concepto", "Valor ($)");
+    rows.push(["Total ventas (neto)",            clp(totalVentasNeto)]);
+    rows.push(["IVA débito (ventas)",             clp(totalVentasIva)]);
+    rows.push(["Total ventas (con IVA)",          clp(totalVentasTotal)]);
+    rows.push(["Total compras (neto)",            clp(totalComprasNeto)]);
+    rows.push(["IVA crédito (compras)",           clp(totalComprasIva)]);
+    rows.push(["Total compras (con IVA)",         clp(totalComprasTotal)]);
+    rows.push(["Utilidad neta",                   clp(utilidadNeta)]);
+    rows.push(["Margen %",                        Number(margen.toFixed(2))]);
+    rows.push(["IVA a pagar / a favor",           clp(ivaAPagar)]);
+    rows.push(["Cantidad de ventas",              ventas.length]);
+    rows.push(["Cantidad de compras",             compras.length]);
+
+    sep(); sep();
+
+    // ── 2. VENTAS POR CLIENTE ──────────────────────────────────────
+    titulo("VENTAS POR CLIENTE");
+    encabezado("Cliente", "Entregas", "Neto ($)", "IVA ($)", "Total ($)");
+    clientesOrdenados.forEach(([nombre, v]) => {
+      rows.push([nombre, v.entregas, clp(v.ventas), clp(v.iva), clp(v.total)]);
+    });
+
+    sep(); sep();
+
+    // ── 3. DETALLE DE VENTAS ───────────────────────────────────────
+    titulo("DETALLE DE VENTAS");
+    const cabVentas: string[] = ["Fecha", "Cliente", "Detalle"];
+    cats.forEach((c) => cabVentas.push(`${c} (un)`));
+    cabVentas.push("Neto ($)", "IVA ($)", "Total ($)");
+    encabezado(...cabVentas);
+    ventas
+      .slice()
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+      .forEach((t) => {
+        const row: Row = [fechaFmt(t.fecha), clienteNombre(t.clienteId), t.detalles];
+        cats.forEach((cat) => row.push(Math.abs(t.stockDelta?.[cat] ?? 0)));
+        row.push(clp(t.montoNeto), clp(t.iva), clp(t.montoTotal));
+        rows.push(row);
+      });
+
+    sep(); sep();
+
+    // ── 4. COMPRAS / COSTOS ────────────────────────────────────────
+    titulo("COMPRAS / COSTOS");
+    const cabCompras: string[] = ["Fecha", "Detalle"];
+    cats.forEach((c) => cabCompras.push(`${c} (un)`));
+    cabCompras.push("Neto ($)", "IVA ($)", "Total ($)");
+    encabezado(...cabCompras);
+    compras
+      .slice()
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+      .forEach((t) => {
+        const row: Row = [fechaFmt(t.fecha), t.detalles];
+        cats.forEach((cat) => row.push(t.stockDelta?.[cat] ?? 0));
+        row.push(clp(t.montoNeto), clp(t.iva), clp(t.montoTotal));
+        rows.push(row);
+      });
+
+    // ── Generar archivo ────────────────────────────────────────────
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 38 }, { wch: 22 }, { wch: 36 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), "Resumen");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ventasRows), "Ventas y Entregas");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(comprasRows), "Compras y Costos");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gananciasRows), "Ganancias por cliente");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(historicoRows), "Histórico completo");
-
+    XLSX.utils.book_append_sheet(wb, ws, "Resumen Colaciones");
     XLSX.writeFile(wb, `gestion-colaciones-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
