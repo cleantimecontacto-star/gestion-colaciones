@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCLP } from "@/lib/format";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, DollarSign, ShoppingCart, Percent, AlertTriangle, Package, XCircle, ChevronUp, ChevronDown } from "lucide-react";
+import { TrendingUp, DollarSign, ShoppingCart, Percent, AlertTriangle, Package, XCircle, ChevronUp, ChevronDown, FileCheck } from "lucide-react";
 
 import { subWeeks, subMonths, subYears, isAfter, format, startOfWeek, startOfMonth, startOfYear } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,7 +20,7 @@ const PERIODO_LABEL: Record<Periodo, string> = {
 };
 
 export default function Dashboard() {
-  const { historial, stock, clientes, categorias } = useStore();
+  const { historial, stock, clientes, categorias, cotizaciones } = useStore();
   const [periodo, setPeriodo] = useState<Periodo>("semana");
   const [alertasMin, setAlertasMin] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -191,6 +191,39 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tarjeta: Cotizaciones Facturadas */}
+      {(() => {
+        const facturadas = cotizaciones.filter((c) => c.estado === "facturada");
+        if (facturadas.length === 0) return null;
+        const { formatCLP: fmt } = { formatCLP };
+        const totalFacturadas = facturadas.reduce((acc, c) => {
+          const neto = c.items.reduce((s, it) => s + it.cantidad * it.precioUnitario, 0);
+          const total = neto * (1 + (c.ivaPorcentaje ?? 19) / 100);
+          return acc + total;
+        }, 0);
+        return (
+          <Card className="shadow-sm border-purple-300 bg-purple-50/60 dark:bg-purple-950/20">
+            <CardHeader className="p-3 pb-1 flex flex-row items-center gap-2 space-y-0">
+              <FileCheck className="h-4 w-4 text-purple-600" />
+              <CardTitle className="text-sm font-medium text-purple-900 dark:text-purple-200">
+                Cotizaciones Facturadas
+              </CardTitle>
+              <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-900">
+                {facturadas.length}
+              </span>
+            </CardHeader>
+            <CardContent className="p-3 pt-2">
+              <div className="text-base md:text-lg font-bold text-purple-700 dark:text-purple-300">
+                {fmt(Math.round(totalFacturadas))}
+              </div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                Total c/IVA de cotizaciones facturadas
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {alertasActivas.length > 0 && (
         <Card className="shadow-sm border-amber-300 bg-amber-50/60 dark:bg-amber-950/20">

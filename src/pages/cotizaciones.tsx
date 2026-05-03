@@ -39,22 +39,15 @@ const ESTADO_CONFIG: Record<EstadoCotizacion, {
   filterActive: string;
   filterInactive: string;
 }> = {
-  borrador: {
-    label: "Borrador",
+  pendiente: {
+    label: "Pendiente",
     variant: "secondary",
     colorClasses: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600",
     filterActive: "bg-slate-600 text-white border-slate-600",
     filterInactive: "bg-background text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-slate-500",
   },
-  enviada: {
-    label: "Enviada",
-    variant: "default",
-    colorClasses: "bg-blue-600 text-white border-blue-600",
-    filterActive: "bg-blue-600 text-white border-blue-600",
-    filterInactive: "bg-background text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700 hover:border-blue-500",
-  },
-  aceptada: {
-    label: "Aceptada",
+  aprobada: {
+    label: "Aprobada",
     variant: "default",
     colorClasses: "bg-green-600 text-white border-green-600",
     filterActive: "bg-green-600 text-white border-green-600",
@@ -66,6 +59,13 @@ const ESTADO_CONFIG: Record<EstadoCotizacion, {
     colorClasses: "bg-red-600 text-white border-red-600",
     filterActive: "bg-red-600 text-white border-red-600",
     filterInactive: "bg-background text-red-700 dark:text-red-400 border-red-300 dark:border-red-700 hover:border-red-500",
+  },
+  facturada: {
+    label: "Facturada",
+    variant: "default",
+    colorClasses: "bg-purple-600 text-white border-purple-600",
+    filterActive: "bg-purple-600 text-white border-purple-600",
+    filterInactive: "bg-background text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-700 hover:border-purple-500",
   },
 };
 
@@ -100,7 +100,7 @@ const emptyForm = (ivaPorcentaje: number, cotizaciones: Cotizacion[]): Omit<Coti
   ot: "",
   facturaCliente: "",
   items: [{ id: Date.now().toString(), descripcion: "", cantidad: 1, precioUnitario: 0 }],
-  estado: "borrador",
+  estado: "pendiente",
   notas: "",
   ivaPorcentaje,
 });
@@ -433,7 +433,7 @@ export default function Cotizaciones() {
         });
     });
 
-    const totalesPorEstado = (["borrador", "enviada", "aceptada", "rechazada"] as const).map((est) => {
+    const totalesPorEstado = (["pendiente", "aprobada", "rechazada", "facturada"] as const).map((est) => {
       const lista = cotizaciones.filter((c) => c.estado === est);
       const sumaTotal = lista.reduce((a, c) => {
         const { total } = calcularTotales(c.items, c.ivaPorcentaje);
@@ -521,7 +521,7 @@ export default function Cotizaciones() {
 
       {/* Filtros de estado — todas las etiquetas en una sola fila, sin scroll */}
       <div className="flex gap-1 w-full pb-1">
-        {(["todas", "borrador", "enviada", "aceptada", "rechazada"] as const).map((estado) => {
+        {(["todas", "pendiente", "aprobada", "rechazada", "facturada"] as const).map((estado) => {
           const isActive = filtro === estado;
           let classes: string;
           if (estado === "todas") {
@@ -960,10 +960,10 @@ export default function Cotizaciones() {
                     onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoCotizacion })}
                     className="mt-0.5 w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
                   >
-                    <option value="borrador">Borrador</option>
-                    <option value="enviada">Enviada</option>
-                    <option value="aceptada">Aceptada</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="aprobada">Aprobada</option>
                     <option value="rechazada">Rechazada</option>
+                    <option value="facturada">Facturada</option>
                   </select>
                 </div>
               </div>
