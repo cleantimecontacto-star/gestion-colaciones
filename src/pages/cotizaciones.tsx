@@ -776,6 +776,21 @@ export default function Cotizaciones() {
                 </div>
               </div>
 
+              {/* Estado */}
+              <div>
+                <label className="text-xs text-muted-foreground">Estado</label>
+                <select
+                  value={form.estado}
+                  onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoCotizacion })}
+                  className="mt-0.5 w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="pendiente">Pendiente</option>
+                  <option value="aprobada">Aprobada</option>
+                  <option value="rechazada">Rechazada</option>
+                  <option value="facturada">Facturada</option>
+                </select>
+              </div>
+
               {/* Cliente */}
               <div>
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Cliente</div>
@@ -951,22 +966,6 @@ export default function Cotizaciones() {
                 </div>
               </div>
 
-              {/* Estado y notas */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground">Estado</label>
-                  <select
-                    value={form.estado}
-                    onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoCotizacion })}
-                    className="mt-0.5 w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
-                  >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="aprobada">Aprobada</option>
-                    <option value="rechazada">Rechazada</option>
-                    <option value="facturada">Facturada</option>
-                  </select>
-                </div>
-              </div>
               <div>
                 <label className="text-xs text-muted-foreground">Notas (opcional)</label>
                 <textarea
