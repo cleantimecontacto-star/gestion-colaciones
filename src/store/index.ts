@@ -62,7 +62,7 @@ export interface Transaccion {
   clienteId?: string;
 }
 
-export type EstadoCotizacion = "borrador" | "enviada" | "aceptada" | "rechazada";
+export type EstadoCotizacion = "pendiente" | "aprobada" | "rechazada" | "facturada";
 
 export interface ItemCotizacion {
   id: string;
@@ -817,7 +817,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "gestion-colaciones-storage",
-      version: 11,
+      version: 12,
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<AppState> & {
           stock?: Record<string, number> | { fruta?: number; snack?: number; barra?: number };
@@ -955,6 +955,17 @@ export const useStore = create<AppState>()(
               delete cfg["Dulces"]; delete cfg["Salados"];
               delete prc["Dulces"]; delete prc["Salados"];
               return { ...c, config: cfg, precios: prc };
+            });
+          }
+        }
+        if (version < 12) {
+          // Migrar estados de cotizaciones: borrador/enviada → pendiente, aceptada → aprobada
+          if (Array.isArray(state.cotizaciones)) {
+            state.cotizaciones = state.cotizaciones.map((c: any) => {
+              let estado = c.estado;
+              if (estado === "borrador" || estado === "enviada") estado = "pendiente";
+              if (estado === "aceptada") estado = "aprobada";
+              return { ...c, estado };
             });
           }
         }
